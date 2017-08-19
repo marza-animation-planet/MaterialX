@@ -1,3 +1,4 @@
+excons.cache
 .build/
 .sconsign.dblite
 release/
