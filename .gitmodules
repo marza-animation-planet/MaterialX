@@ -1,9 +1,3 @@
 [submodule "excons"]
 	path = excons
 	url = git://github.com/gatgui/excons.git
-[submodule "OpenColorIO"]
-	path = OpenColorIO
-	url = git://github.com/gatgui/OpenColorIO.git
-[submodule "pybind11"]
-	path = pybind11
-	url = git://github.com/pybind/pybind11
