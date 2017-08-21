@@ -30,7 +30,7 @@ defs.append("MATERIALX_BUILD_VERSION=2")
 
 
 if sys.platform == "win32":
-    cppflags += " /W4"
+    cppflags += " /W4 /MP /bigobj"
 else:
     cppflags += " -std=gnu++11 -Wall -Wno-ignored-qualifiers -Wno-unused-parameter -Wno-undefined-var-template"
 
