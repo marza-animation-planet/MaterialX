@@ -14,7 +14,7 @@ namespace mx = MaterialX;
 
 void bindPyNode(py::module& mod)
 {
-    py::class_<mx::Node, mx::NodePtr, mx::InterfaceElement>(mod, "Node", py::metaclass())
+    py::class_<mx::Node, mx::NodePtr, mx::InterfaceElement>(mod, "Node")
         .def("setConnectedNode", &mx::Node::setConnectedNode)
         .def("getConnectedNode", &mx::Node::getConnectedNode)
         .def("setConnectedNodeName", &mx::Node::setConnectedNodeName)
@@ -24,7 +24,7 @@ void bindPyNode(py::module& mod)
         .def("getDownstreamPorts", &mx::Node::getDownstreamPorts)
         .def_readonly_static("CATEGORY", &mx::Node::CATEGORY);
 
-    py::class_<mx::NodeGraph, mx::NodeGraphPtr, mx::Element>(mod, "NodeGraph", py::metaclass())
+    py::class_<mx::NodeGraph, mx::NodeGraphPtr, mx::Element>(mod, "NodeGraph")
         .def("setNodeDef", &mx::NodeGraph::setNodeDef)
         .def("hasNodeDef", &mx::NodeGraph::hasNodeDef)
         .def("getNodeDef", &mx::NodeGraph::getNodeDef)
@@ -40,5 +40,6 @@ void bindPyNode(py::module& mod)
         .def("removeOutput", &mx::NodeGraph::removeOutput)
         .def("flattenSubgraphs", &mx::NodeGraph::flattenSubgraphs,
             py::arg("target") = mx::EMPTY_STRING)
+        .def("topologicalSort", &mx::NodeGraph::topologicalSort)
         .def_readonly_static("CATEGORY", &mx::NodeGraph::CATEGORY);
 }

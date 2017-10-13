@@ -16,17 +16,23 @@ namespace mx = MaterialX;
 
 void bindPyDefinition(py::module& mod)
 {
-    py::class_<mx::NodeDef, mx::NodeDefPtr, mx::InterfaceElement>(mod, "NodeDef", py::metaclass())
+    py::class_<mx::NodeDef, mx::NodeDefPtr, mx::InterfaceElement>(mod, "NodeDef")
         .def("setNode", &mx::NodeDef::setNode)
         .def("hasNode", &mx::NodeDef::hasNode)
         .def("getNode", &mx::NodeDef::getNode)
         .def("getInstantiatingShaderRefs", &mx::NodeDef::getInstantiatingShaderRefs)
         .def_readonly_static("CATEGORY", &mx::NodeDef::CATEGORY);
 
-    py::class_<mx::TypeDef, mx::TypeDefPtr, mx::Element>(mod, "TypeDef", py::metaclass())
+    py::class_<mx::TypeDef, mx::TypeDefPtr, mx::Element>(mod, "TypeDef")
+        .def("setSemantic", &mx::TypeDef::setSemantic)
+        .def("hasSemantic", &mx::TypeDef::hasSemantic)
+        .def("getSemantic", &mx::TypeDef::getSemantic)
+        .def("setContext", &mx::TypeDef::setContext)
+        .def("hasContext", &mx::TypeDef::hasContext)
+        .def("getContext", &mx::TypeDef::getContext)
         .def_readonly_static("CATEGORY", &mx::TypeDef::CATEGORY);
 
-    py::class_<mx::Implementation, mx::ImplementationPtr, mx::InterfaceElement>(mod, "Implementation", py::metaclass())
+    py::class_<mx::Implementation, mx::ImplementationPtr, mx::InterfaceElement>(mod, "Implementation")
         .def("setNodeDef", &mx::Implementation::setNodeDef)
         .def("hasNodeDef", &mx::Implementation::hasNodeDef)
         .def("getNodeDef", &mx::Implementation::getNodeDef)

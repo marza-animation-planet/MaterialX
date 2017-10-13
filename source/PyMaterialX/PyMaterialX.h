@@ -11,12 +11,6 @@
 // translation unit within the PyMaterialX library.
 //
 
-#ifdef __GNUC__
-#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-#endif
-
 #include <PyBind11/pybind11.h>
-
-PYBIND11_DECLARE_HOLDER_TYPE(holder, std::shared_ptr<holder>);
 
 #endif

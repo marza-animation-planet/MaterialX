@@ -1,5 +1,23 @@
 # Change Log
 
+## [1.35.3] - 2017-10-11
+
+### Added
+- Added support for Python 3.
+- Added support for standard TypeDef attributes.
+- Added support for values of type 'stringarray'.
+- Added method Element\:\:setName.
+- Extended Python bindings for Document, NodeGraph, MaterialAssign, and Collection.
+
+### Changed
+- Modified NodeGraph\:\:topologicalSort to return elements in a more intuitive top-down order, with upstream elements preceding downstream elements.
+- Removed special cases for string return values in MaterialX Python, with all strings now returned as 'unicode' in Python 2 and 'str' in Python 3.
+- Updated OSL reference implementations.
+
+### Fixed
+- Fixed handling of empty names in Element\:\:addChildOfCategory.
+- Fixed an edge case in Document\:\:upgradeVersion.
+
 ## [1.35.2] - 2017-07-03
 
 ### Added
@@ -38,7 +56,7 @@ Updated the MaterialX library to the v1.35 specification.
 - Removed the 'default' attribute from MaterialX\:\:ValueElement.  In v1.35, this functionality is now handled by the 'value' attribute.
 - Replaced the 'matrix' type with 'matrix33' and 'matrix44', and replaced the MaterialX\:\:Matrix16 class with MaterialX\:\:Matrix3x3 and MaterialX\:\:Matrix4x4.
 - Renamed Material\:\:getMaterialAssigns to Material\:\:getReferencingMaterialAssigns.
-- Change the argument type for MaterialAssign\:\:setExclusive and MaterialAssign\:\:getExclusive to boolean.
+- Changed the argument type for MaterialAssign\:\:setExclusive and MaterialAssign\:\:getExclusive to boolean.
 
 ## [1.34.4] - 2017-06-09
 

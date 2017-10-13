@@ -1,16 +1,19 @@
 project(MaterialX)
 set(MATERIALX_MAJOR_VERSION 1)
 set(MATERIALX_MINOR_VERSION 35)
-set(MATERIALX_BUILD_VERSION 2)
+set(MATERIALX_BUILD_VERSION 3)
 
 cmake_minimum_required(VERSION 3.1)
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_POSITION_INDEPENDENT_CODE TRUE)
+set(CMAKE_MACOSX_RPATH ON)
+include(CheckCXXCompilerFlag)
+enable_testing()
 
 option(MATERIALX_BUILD_PYTHON "Build the MaterialX Python package from C++ bindings. Requires Python 2.6 or greater." OFF)
-option(MATERIALX_GENERATE_DOCS "Create HTML documentation using Doxygen. Requires that Doxygen be installed." OFF)
+option(MATERIALX_BUILD_DOCS "Create HTML documentation using Doxygen. Requires that Doxygen be installed." OFF)
 
-mark_as_advanced(MATERIALX_GENERATE_DOCS)
+mark_as_advanced(MATERIALX_BUILD_DOCS)
 
 set(MATERIALX_PYTHON_EXECUTABLE "" CACHE FILEPATH
     "Path to the Python executable (e.g. 'C:/Python27/python.exe').")
@@ -29,6 +32,10 @@ mark_as_advanced(MATERIALX_PYTHON_OCIO_DIR)
 set(PYTHON_INCLUDE_DIR ${MATERIALX_PYTHON_INCLUDE_DIR})
 set(PYTHON_LIBRARY ${MATERIALX_PYTHON_LIBRARY})
 
+option(MATERIALX_INSTALL_PYTHON "Install the MaterialX Python package as a third-party library when the install target is built." ON)
+
+mark_as_advanced(MATERIALX_INSTALL_PYTHON)
+
 # Adjust the default installation path
 if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
     set(CMAKE_INSTALL_PREFIX "${CMAKE_BINARY_DIR}/installed" CACHE PATH "Default install path" FORCE)
@@ -39,10 +46,16 @@ if(MSVC)
     if(CMAKE_CXX_FLAGS MATCHES "/W[0-4]")
         string(REGEX REPLACE "/W[0-4]" "/W4" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
     else()
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /W4")
+        add_compile_options(/W4)
     endif()
-elseif(CMAKE_COMPILER_IS_GNUCXX)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
+elseif(CMAKE_CXX_COMPILER_ID MATCHES GNU)
+    add_compile_options(-Wall)
+elseif(CMAKE_CXX_COMPILER_ID MATCHES Clang)
+    add_compile_options(-Wall)
+    CHECK_CXX_COMPILER_FLAG(-Wno-undefined-var-template UNDEFINED_VAR_TEMPLATE_FLAG)
+    if(UNDEFINED_VAR_TEMPLATE_FLAG)
+        add_compile_options(-Wno-undefined-var-template)
+    endif()
 endif()
 
 # Add subdirectories
@@ -55,6 +68,6 @@ if(MATERIALX_BUILD_PYTHON)
     add_subdirectory(python)
 endif(MATERIALX_BUILD_PYTHON)
 
-if(MATERIALX_GENERATE_DOCS)
+if(MATERIALX_BUILD_DOCS)
     add_subdirectory(documents)
-endif(MATERIALX_GENERATE_DOCS)
+endif(MATERIALX_BUILD_DOCS)

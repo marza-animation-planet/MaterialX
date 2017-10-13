@@ -16,7 +16,7 @@ void bindPyDocument(py::module& mod)
 {
     mod.def("createDocument", &mx::createDocument);
 
-    py::class_<mx::Document, mx::DocumentPtr, mx::Element>(mod, "Document", py::metaclass())
+    py::class_<mx::Document, mx::DocumentPtr, mx::Element>(mod, "Document")
         .def("initialize", &mx::Document::initialize)
         .def("copy", &mx::Document::copy)
         .def("importLibrary", &mx::Document::importLibrary)
@@ -61,6 +61,7 @@ void bindPyDocument(py::module& mod)
         .def("getNodeDefs", &mx::Document::getNodeDefs)
         .def("removeNodeDef", &mx::Document::removeNodeDef)
         .def("getMatchingNodeDefs", &mx::Document::getMatchingNodeDefs)
+        .def("getMatchingImplementations", &mx::Document::getMatchingImplementations)
         .def("addPropertySet", &mx::Document::addPropertySet,
             py::arg("name") = mx::EMPTY_STRING)
         .def("getPropertySet", &mx::Document::getPropertySet)

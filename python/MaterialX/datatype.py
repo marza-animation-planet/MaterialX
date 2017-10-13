@@ -1,6 +1,7 @@
 import re
+import sys
 
-from MaterialX.PyMaterialX import *
+from .PyMaterialX import *
 
 """
 Native Python helper functions for MaterialX data types.
@@ -22,7 +23,7 @@ _nameToType = { 'integer'   : int,
                 'string'    : str }
 _typeToName = dict(reversed(i) for i in _nameToType.items())
 
-_stringTypeAliases = [unicode]
+_stringTypeAliases = [unicode] if sys.version_info[0] < 3 else [bytes]
 _typeToName.update(dict.fromkeys(_stringTypeAliases, 'string'))
 
 
@@ -43,12 +44,25 @@ def nameToType(name):
 
 
 #--------------------------------------------------------------------------------
-def isColorType(t):
-    "Return True if the given type is a MaterialX color."
-    return t == Color2 or t == Color3 or t == Color4
+def valueToString(value):
+    "Convert a value of MaterialX type to a string."
+    method = globals()['TypedValue_' + typeToName(type(value))].createValue
+    return method(value).getValueString()
 
 
 #--------------------------------------------------------------------------------
-def isColorValue(val):
+def stringToValue(string, t):
+    "Convert a string to a value of MaterialX type."
+    return Value.createValueFromStrings(string, typeToName(t)).getData()
+
+
+#--------------------------------------------------------------------------------
+def isColorType(t):
+    "Return True if the given type is a MaterialX color."
+    return t in (Color2, Color3, Color4)
+
+
+#--------------------------------------------------------------------------------
+def isColorValue(value):
     "Return True if the given value is a MaterialX color."
-    return isColorType(val.__class__)
+    return isColorType(type(value))
