@@ -8,10 +8,6 @@
 #include <MaterialXCore/Util.h>
 #include <MaterialXCore/Value.h>
 
-#ifdef __GNUC__
-#pragma GCC diagnostic ignored "-Wmissing-braces"
-#endif
-
 namespace mx = MaterialX;
 
 template<class T> void testTypedValue(const T& v1, const T& v2)
@@ -61,10 +57,10 @@ TEST_CASE("Typed values", "[value]")
                    mx::Vector3(1.5f, 2.5f, 3.5f));
     testTypedValue(mx::Vector4(1.0f, 2.0f, 3.0f, 4.0f),
                    mx::Vector4(1.5f, 2.5f, 3.5f, 4.5f));
-    testTypedValue(mx::Matrix3x3(std::array<float, 9>{0.0f}),
-                   mx::Matrix3x3(std::array<float, 9>{1.0f}));
-    testTypedValue(mx::Matrix4x4(std::array<float, 16>{0.0f}),
-                   mx::Matrix4x4(std::array<float, 16>{1.0f}));
+    testTypedValue(mx::Matrix3x3(0.0f),
+                   mx::Matrix3x3(1.0f));
+    testTypedValue(mx::Matrix4x4(0.0f),
+                   mx::Matrix4x4(1.0f));
     testTypedValue(std::string("first_value"),
                    std::string("second_value"));
     testTypedValue(std::vector<std::string>{"one", "two", "three"},

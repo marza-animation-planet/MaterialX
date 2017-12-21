@@ -1,5 +1,26 @@
 # Change Log
 
+## [1.35.4] - 2017-12-18
+
+### Added
+- Added high-level Material API, including getPrimaryShaderParameters, getPrimaryShaderInputs, getBoundGeomStrings, and getBoundGeomCollections.
+- Added methods ValueElement\:\:getBoundValue and ValueElement\:\:getDefaultValue.
+- Added support for multi-output nodes.
+- Added support for TypeDef members.
+- Added StringResolver class, for applying substring modifiers to data values.
+- Added example interfaces for the Disney BRDF, Disney BSDF, and alSurface shaders.
+
+### Changed
+- Renamed method Material\:\:getReferencedShaderDefs to Material\:\:getShaderNodeDefs.
+- Renamed method ShaderRef\:\:getReferencedShaderDef to ShaderRef\:\:getNodeDef.
+- Renamed method Node\:\:getReferencedNodeDef to Node\:\:getNodeDef.
+- Added a 'string' suffix to all accessors for 'node', 'nodedef', and 'collection' strings.
+- Combined individual booleans into an XmlReadOptions argument for the XML read functions.
+
+### Removed
+- Removed method Document\:\:applyStringSubstitutions (deprecated in Python).
+- Removed method InterfaceElement\:\:getParameterValueString (deprecated in Python).
+
 ## [1.35.3] - 2017-10-11
 
 ### Added

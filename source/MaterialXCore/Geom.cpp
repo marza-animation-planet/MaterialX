@@ -5,21 +5,22 @@
 
 #include <MaterialXCore/Geom.h>
 
-#include <iterator>
+#include <MaterialXCore/Document.h>
 
 namespace MaterialX
 {
 
 const string UNIVERSAL_GEOM_NAME = "*";
 const string UDIM_TOKEN = "%UDIM";
+const string UV_TILE_TOKEN = "%UVTILE";
 
 const string GeomElement::GEOM_ATTRIBUTE = "geom";
 const string GeomElement::COLLECTION_ATTRIBUTE = "collection";
 
 bool geomStringsMatch(const string& geom1, const string& geom2)
 {
-    vector<string> vec1 = splitString(geom1, ",");
-    vector<string> vec2 = splitString(geom2, ",");
+    vector<string> vec1 = splitString(geom1, ARRAY_VALID_SEPARATORS);
+    vector<string> vec2 = splitString(geom2, ARRAY_VALID_SEPARATORS);
     std::set<string> set1(vec1.begin(), vec1.end());
     std::set<string> set2(vec2.begin(), vec2.end());
 
@@ -32,6 +33,23 @@ bool geomStringsMatch(const string& geom1, const string& geom2)
     std::set_intersection(set1.begin(), set1.end(), set2.begin(), set2.end(), 
                           std::inserter(matches, matches.end()));
     return !matches.empty();
+}
+
+void GeomElement::setCollection(CollectionPtr collection)
+{
+    if (collection)
+    {
+        setCollectionString(collection->getName());
+    }
+    else
+    {
+        removeAttribute(COLLECTION_ATTRIBUTE);
+    }
+}
+
+CollectionPtr GeomElement::getCollection() const
+{
+    return getDocument()->getCollection(getCollectionString());
 }
 
 } // namespace MaterialX

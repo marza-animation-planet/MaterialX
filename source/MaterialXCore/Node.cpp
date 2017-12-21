@@ -68,45 +68,20 @@ string Node::getConnectedNodeName(const string& inputName) const
     return input->getNodeName();
 }
 
-NodeDefPtr Node::getReferencedNodeDef() const
+NodeDefPtr Node::getNodeDef(const string& target) const
 {
     for (NodeDefPtr nodeDef : getDocument()->getMatchingNodeDefs(getCategory()))
     {
-        if (nodeDef->getType() == getType())
+        if (targetStringsMatch(target, nodeDef->getTarget()) &&
+            isTypeCompatible(nodeDef))
         {
-            for (InputPtr input : getInputs())
-            {
-                InputPtr matchingInput = nodeDef->getInput(input->getName());
-                if (matchingInput && matchingInput->getType() != input->getType())
-                {
-                    continue;
-                }
-            }
             return nodeDef;
         }
     }
     return NodeDefPtr();
 }
 
-ElementPtr Node::getImplementation(const string& target) const
-{
-    NodeDefPtr nodeDef = getReferencedNodeDef();
-    if (nodeDef)
-    {
-        vector<ElementPtr> implementations = getDocument()->getMatchingImplementations(nodeDef->getName());
-        for (ElementPtr implementation : implementations)
-        {
-            if (implementation->getTarget() == target)
-            {
-                return implementation;
-            }
-        }
-    }
-
-    return ElementPtr();
-}
-
-Edge Node::getUpstreamEdge(MaterialPtr material, size_t index)
+Edge Node::getUpstreamEdge(ConstMaterialPtr material, size_t index) const
 {
     if (index < getUpstreamEdgeCount())
     {
@@ -114,7 +89,7 @@ Edge Node::getUpstreamEdge(MaterialPtr material, size_t index)
         ElementPtr upstreamNode = input->getConnectedNode();
         if (upstreamNode)
         {
-            return Edge(getSelf(), input, upstreamNode);
+            return Edge(getSelfNonConst(), input, upstreamNode);
         }
     }
 
@@ -145,6 +120,11 @@ bool Node::validate(string* message) const
 // NodeGraph methods
 //
 
+NodeDefPtr NodeGraph::getNodeDef() const
+{
+    return getDocument()->getNodeDef(getNodeDefString());
+}
+
 void NodeGraph::flattenSubgraphs(const string& target)
 {
     vector<NodePtr> initialNodes = getNodes();
@@ -155,7 +135,7 @@ void NodeGraph::flattenSubgraphs(const string& target)
         NodePtr refNode = nodeQueue.front();
         nodeQueue.pop_front();
 
-        ElementPtr implement = refNode->getImplementation(target);
+        InterfaceElementPtr implement = refNode->getImplementation(target);
         if (!implement || !implement->isA<NodeGraph>())
         {
             continue;
@@ -205,7 +185,7 @@ void NodeGraph::flattenSubgraphs(const string& target)
 
             // Check if the new subnode has a graph implementation.
             // If so this subgraph will need to be flattened as well.
-            ElementPtr subNodeImplement = newSubNode->getImplementation(target);
+            InterfaceElementPtr subNodeImplement = newSubNode->getImplementation(target);
             if (subNodeImplement && subNodeImplement->isA<NodeGraph>())
             {
                 nodeQueue.push_back(newSubNode);

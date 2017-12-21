@@ -16,12 +16,23 @@
 namespace MaterialX
 {
 
+extern const string COLOR_SEMANTIC;
+extern const string SHADER_SEMANTIC;
+
 /// A shared pointer to a NodeDef
 using NodeDefPtr = shared_ptr<class NodeDef>;
-/// A shared pointer to a TypeDef
-using TypeDefPtr = shared_ptr<class TypeDef>;
+/// A shared pointer to a const NodeDef
+using ConstNodeDefPtr = shared_ptr<const class NodeDef>;
+
 /// A shared pointer to an Implementation
 using ImplementationPtr = shared_ptr<class Implementation>;
+/// A shared pointer to a const Implementation
+using ConstImplementationPtr = shared_ptr<const class Implementation>;
+
+/// A shared pointer to a TypeDef
+using TypeDefPtr = shared_ptr<class TypeDef>;
+/// A shared pointer to a Member
+using MemberPtr = shared_ptr<class Member>;
 
 /// @class NodeDef
 /// A node definition element within a Document.
@@ -43,25 +54,38 @@ class NodeDef : public InterfaceElement
     /// @{
 
     /// Set the node string of the NodeDef.
-    void setNode(const string& node)
+    void setNodeString(const string& node)
     {
         setAttribute(NODE_ATTRIBUTE, node);
     }
 
     /// Return true if the given NodeDef has a node string.
-    bool hasNode() const
+    bool hasNodeString() const
     {
         return hasAttribute(NODE_ATTRIBUTE);
     }
 
     /// Return the node string of the NodeDef.
-    const string& getNode() const
+    const string& getNodeString() const
     {
         return getAttribute(NODE_ATTRIBUTE);
     }
 
     /// @}
-    /// @name Connections
+    /// @name Implementation References
+    /// @{
+
+    /// Return the first implementation for this nodedef, optionally filtered
+    /// by the given target name.
+    /// @param target An optional target name, which will be used to filter
+    ///    the implementations that are considered.
+    /// @return An implementation for this nodedef, or an empty shared pointer
+    ///    if none was found.  Note that a node implementation may be either
+    ///    an Implementation element or a NodeGraph element.
+    InterfaceElementPtr getImplementation(const string& target = EMPTY_STRING) const;
+
+    /// @}
+    /// @name Shader References
     /// @{
 
     /// Return all ShaderRef elements that instantiate this NodeDef.
@@ -82,65 +106,6 @@ class NodeDef : public InterfaceElement
     static const string NODE_ATTRIBUTE;
 };
 
-/// @class TypeDef
-/// A type definition element within a Document.
-class TypeDef : public Element
-{
-  public:
-    TypeDef(ElementPtr parent, const string& name) :
-        Element(parent, CATEGORY, name)
-    {
-    }
-    virtual ~TypeDef() { }
-
-    /// @name Semantic
-    /// @{
-
-    /// Set the semantic string of the TypeDef.
-    void setSemantic(const string& semantic)
-    {
-        setAttribute(SEMANTIC_ATTRIBUTE, semantic);
-    }
-
-    /// Return true if the given TypeDef has a semantic string.
-    bool hasSemantic() const
-    {
-        return hasAttribute(SEMANTIC_ATTRIBUTE);
-    }
-
-    /// Return the semantic string of the TypeDef.
-    const string& getSemantic() const
-    {
-        return getAttribute(SEMANTIC_ATTRIBUTE);
-    }
-
-    /// @name Context
-    /// @{
-
-    /// Set the context string of the TypeDef.
-    void setContext(const string& context)
-    {
-        setAttribute(CONTEXT_ATTRIBUTE, context);
-    }
-
-    /// Return true if the given TypeDef has a context string.
-    bool hasContext() const
-    {
-        return hasAttribute(CONTEXT_ATTRIBUTE);
-    }
-
-    /// Return the context string of the TypeDef.
-    const string& getContext() const
-    {
-        return getAttribute(CONTEXT_ATTRIBUTE);
-    }
-
-  public:
-    static const string CATEGORY;
-    static const string SEMANTIC_ATTRIBUTE;
-    static const string CONTEXT_ATTRIBUTE;
-};
-
 /// @class Implementation
 /// An implementation element within a Document.
 ///
@@ -156,26 +121,42 @@ class Implementation : public InterfaceElement
     }
     virtual ~Implementation() { }
 
-    /// @name NodeDef String
+    /// @name NodeDef
     /// @{
 
     /// Set the NodeDef string for the Implementation.
-    void setNodeDef(const string& nodeDef)
+    void setNodeDefString(const string& nodeDef)
     {
         setAttribute(NODE_DEF_ATTRIBUTE, nodeDef);
     }
 
     /// Return true if the given Implementation has a NodeDef string.
-    bool hasNodeDef() const
+    bool hasNodeDefString() const
     {
         return hasAttribute(NODE_DEF_ATTRIBUTE);
     }
 
     /// Return the NodeDef string for the Implementation.
-    const string& getNodeDef() const
+    const string& getNodeDefString() const
     {
         return getAttribute(NODE_DEF_ATTRIBUTE);
     }
+
+    /// Set the NodeDef element for the Implementation.
+    void setNodeDef(NodeDefPtr nodeDef)
+    {
+        if (nodeDef)
+        {
+            setNodeDefString(nodeDef->getName());
+        }
+        else
+        {
+            removeAttribute(NODE_DEF_ATTRIBUTE);
+        }
+    }
+
+    /// Return the NodeDef element for the Implementation.
+    NodeDefPtr getNodeDef() const;
 
     /// @}
     /// @name File String
@@ -251,6 +232,115 @@ public:
     static const string FILE_ATTRIBUTE;
     static const string FUNCTION_ATTRIBUTE;
     static const string LANGUAGE_ATTRIBUTE;
+};
+
+/// @class TypeDef
+/// A type definition element within a Document.
+class TypeDef : public Element
+{
+  public:
+    TypeDef(ElementPtr parent, const string& name) :
+        Element(parent, CATEGORY, name)
+    {
+    }
+    virtual ~TypeDef() { }
+
+    /// @name Semantic
+    /// @{
+
+    /// Set the semantic string of the TypeDef.
+    void setSemantic(const string& semantic)
+    {
+        setAttribute(SEMANTIC_ATTRIBUTE, semantic);
+    }
+
+    /// Return true if the given TypeDef has a semantic string.
+    bool hasSemantic() const
+    {
+        return hasAttribute(SEMANTIC_ATTRIBUTE);
+    }
+
+    /// Return the semantic string of the TypeDef.
+    const string& getSemantic() const
+    {
+        return getAttribute(SEMANTIC_ATTRIBUTE);
+    }
+
+    /// @}
+    /// @name Context
+    /// @{
+
+    /// Set the context string of the TypeDef.
+    void setContext(const string& context)
+    {
+        setAttribute(CONTEXT_ATTRIBUTE, context);
+    }
+
+    /// Return true if the given TypeDef has a context string.
+    bool hasContext() const
+    {
+        return hasAttribute(CONTEXT_ATTRIBUTE);
+    }
+
+    /// Return the context string of the TypeDef.
+    const string& getContext() const
+    {
+        return getAttribute(CONTEXT_ATTRIBUTE);
+    }
+
+    /// @}
+    /// @name Member Elements
+    /// @{
+
+    /// Add a Member to the TypeDef.
+    /// @param name The name of the new Member.
+    ///     If no name is specified, then a unique name will automatically be
+    ///     generated.
+    /// @return A shared pointer to the new Member.
+    MemberPtr addMember(const string& name = EMPTY_STRING)
+    {
+        return addChild<Member>(name);
+    }
+
+    /// Return the Member, if any, with the given name.
+    MemberPtr getMember(const string& name) const
+    {
+        return getChildOfType<Member>(name);
+    }
+
+    /// Return a vector of all Member elements in the TypeDef.
+    vector<MemberPtr> getMembers() const
+    {
+        return getChildrenOfType<Member>();
+    }
+
+    /// Remove the Member, if any, with the given name.
+    void removeMember(const string& name)
+    {
+        removeChildOfType<Member>(name);
+    }
+
+    /// @}
+
+  public:
+    static const string CATEGORY;
+    static const string SEMANTIC_ATTRIBUTE;
+    static const string CONTEXT_ATTRIBUTE;
+};
+
+/// @class Member
+/// A member element within a TypeDef.
+class Member : public TypedElement
+{
+  public:
+    Member(ElementPtr parent, const string& name) :
+        TypedElement(parent, CATEGORY, name)
+    {
+    }
+    virtual ~Member() { }
+
+  public:
+    static const string CATEGORY;
 };
 
 } // namespace MaterialX

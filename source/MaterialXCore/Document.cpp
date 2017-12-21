@@ -7,9 +7,7 @@
 
 #include <MaterialXCore/Util.h>
 
-#include <iterator>
 #include <mutex>
-#include <sstream>
 
 namespace MaterialX
 {
@@ -96,22 +94,22 @@ class Document::Cache
                         valueElem->getPublicName(),
                         valueElem));
                 }
-                if (nodeDef && nodeDef->hasNode())
+                if (nodeDef && nodeDef->hasNodeString())
                 {
                     nodeDefMap.insert(std::pair<string, NodeDefPtr>(
-                        nodeDef->getNode(),
+                        nodeDef->getNodeString(),
                         nodeDef));
                 }
-                if (nodeGraph && nodeGraph->hasNodeDef())
+                if (nodeGraph && nodeGraph->hasNodeDefString())
                 {
-                    implementationMap.insert(std::pair<string, ElementPtr>(
-                        nodeGraph->getNodeDef(),
+                    implementationMap.insert(std::pair<string, InterfaceElementPtr>(
+                        nodeGraph->getNodeDefString(),
                         nodeGraph));
                 }
-                if (implementation && implementation->hasNodeDef())
+                if (implementation && implementation->hasNodeDefString())
                 {
-                    implementationMap.insert(std::pair<string, ElementPtr>(
-                        implementation->getNodeDef(),
+                    implementationMap.insert(std::pair<string, InterfaceElementPtr>(
+                        implementation->getNodeDefString(),
                         implementation));
                 }
             }
@@ -127,7 +125,7 @@ class Document::Cache
     std::unordered_multimap<string, PortElementPtr> portElementMap;
     std::unordered_multimap<string, ValueElementPtr> publicElementMap;
     std::unordered_multimap<string, NodeDefPtr> nodeDefMap;
-    std::unordered_multimap<string, ElementPtr> implementationMap;
+    std::unordered_multimap<string, InterfaceElementPtr> implementationMap;
 };
 
 //
@@ -224,13 +222,13 @@ vector<NodeDefPtr> Document::getMatchingNodeDefs(const string& nodeName) const
     return nodeDefs;
 }
 
-vector<ElementPtr> Document::getMatchingImplementations(const string& nodeDef) const
+vector<InterfaceElementPtr> Document::getMatchingImplementations(const string& nodeDef) const
 {
     // Refresh the cache.
     _cache->refresh();
 
     // Find all implementations matching the given nodedef string.
-    vector<ElementPtr> implementations;
+    vector<InterfaceElementPtr> implementations;
     auto keyRange = _cache->implementationMap.equal_range(nodeDef);
     for (auto it = keyRange.first; it != keyRange.second; ++it)
     {
@@ -271,28 +269,6 @@ vector<ElementPtr> Document::getPublicElements(const string& publicName) const
 
     // Return the matches.
     return publicElements;
-}
-
-StringMap Document::getFilenameStringMap(const string& geom) const
-{
-    StringMap map;
-    for (GeomInfoPtr geomInfo : getGeomInfos())
-    {
-        if (!geomStringsMatch(geom, geomInfo->getGeom()))
-            continue;
-        for (GeomAttrPtr geomAttr : geomInfo->getGeomAttrs())
-        {
-            string key = "%" + geomAttr->getName();
-            string value = geomAttr->getResolvedValueString();
-            map[key] = value;
-        }
-    }
-    return map;
-}
-
-string Document::applyStringSubstitutions(const string& filename, const string& geom) const
-{
-    return replaceSubstrings(filename, getFilenameStringMap(geom));
 }
 
 void Document::generateRequireString()
@@ -439,7 +415,7 @@ void Document::upgradeVersion()
                     }
                     if (nodeDef->hasAttribute("shaderprogram"))
                     {
-                        nodeDef->setNode(nodeDef->getAttribute("shaderprogram"));
+                        nodeDef->setNodeString(nodeDef->getAttribute("shaderprogram"));
                         nodeDef->removeAttribute("shaderprogram");
                     }
                 }
@@ -480,12 +456,12 @@ void Document::upgradeVersion()
         {
             for (ShaderRefPtr shaderRef : mat->getShaderRefs())
             {
-                if (!shaderRef->getReferencedShaderDef())
+                if (!shaderRef->getNodeDef())
                 {
                     NodeDefPtr nodeDef = getNodeDef(shaderRef->getName());
                     if (nodeDef)
                     {
-                        shaderRef->setNodeDef(nodeDef->getName());
+                        shaderRef->setNodeDefString(nodeDef->getName());
                     }
                 }
             }
@@ -502,7 +478,7 @@ void Document::upgradeVersion()
                     {
                         for (ShaderRefPtr shaderRef : mat->getShaderRefs())
                         {
-                            if (nodeDef == shaderRef->getReferencedShaderDef())
+                            if (nodeDef == shaderRef->getNodeDef())
                             {
                                 if (shaderRef->getChild(input->getName()))
                                 {

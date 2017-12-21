@@ -18,6 +18,8 @@ namespace MaterialX
 
 /// A shared pointer to a Value
 using ValuePtr = shared_ptr<class Value>;
+/// A shared pointer to a const Value
+using ConstValuePtr = shared_ptr<const class Value>;
 
 template <class T> class TypedValue;
 
@@ -78,7 +80,7 @@ template <class T> class TypedValue : public Value
         _data(ZERO)
     {
     }
-    TypedValue(const T& value) :
+    explicit TypedValue(const T& value) :
         _data(value)
     {
     }

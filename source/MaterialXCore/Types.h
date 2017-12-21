@@ -15,21 +15,20 @@
 #include <istream>
 #include <ostream>
 
-#ifdef __GNUC__
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wmissing-braces"
-#endif
-
 namespace MaterialX
 {
 
 extern const string DEFAULT_TYPE_STRING;
 extern const string FILENAME_TYPE_STRING;
+extern const string GEOMNAME_TYPE_STRING;
 extern const string SURFACE_SHADER_TYPE_STRING;
 extern const string VOLUME_SHADER_TYPE_STRING;
+extern const string MULTI_OUTPUT_TYPE_STRING;
 extern const string VALUE_STRING_TRUE;
 extern const string VALUE_STRING_FALSE;
 extern const string NAME_PATH_SEPARATOR;
+extern const string ARRAY_VALID_SEPARATORS;
+extern const string ARRAY_PREFERRED_SEPARATOR;
 
 /// The base class for vectors of floating-point values
 class VectorBase { };
@@ -39,8 +38,9 @@ template <size_t N> class VectorN : public VectorBase
 {
   public:
     VectorN() : data{0.0f} { }
-    VectorN(const std::array<float, N>& arr) : data(arr) { }
-    VectorN(const vector<float>& vec) { std::copy_n(vec.begin(), N, data.begin()); }
+    explicit VectorN(float f) { data.fill(f); }
+    explicit VectorN(const std::array<float, N>& arr) : data(arr) { }
+    explicit VectorN(const vector<float>& vec) { std::copy_n(vec.begin(), N, data.begin()); }
 
     bool operator==(const VectorN& rhs) const { return data == rhs.data; }
     bool operator!=(const VectorN& rhs) const { return data != rhs.data; }
@@ -48,7 +48,7 @@ template <size_t N> class VectorN : public VectorBase
     float operator[](size_t i) const { return data.at(i); }
     float& operator[](size_t i) { return data.at(i); }
 
-    size_t length() const { return N; }
+    static size_t length() { return N; }
 
   public:
     std::array<float, N> data;
@@ -129,7 +129,7 @@ template <std::size_t N> std::ostream& operator<<(std::ostream& os, const Vector
 {
     for (size_t i = 0; i < N - (size_t) 1; i++)
     {
-        os << v[i] << ", ";
+        os << v[i] << ARRAY_PREFERRED_SEPARATOR;
     }
     os << v[N - (size_t) 1];
     return os;
@@ -139,9 +139,5 @@ std::istream& operator>>(std::istream& is, vector<string>& v);
 std::ostream& operator<<(std::ostream& os, const vector<string>& v);
 
 } // namespace MaterialX
-
-#ifdef __GNUC__
-#pragma GCC diagnostic pop
-#endif
 
 #endif

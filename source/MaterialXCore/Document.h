@@ -166,7 +166,7 @@ class Document : public Element
     /// @param name The name of the new GeomInfo.
     ///     If no name is specified, then a unique name will automatically be
     ///     generated.
-    /// @param geom An optional geom string for the GeomInfo.
+    /// @param geom An optional geometry string for the GeomInfo.
     /// @return A shared pointer to the new GeomInfo.
     GeomInfoPtr addGeomInfo(const string& name = EMPTY_STRING, const string& geom = UNIVERSAL_GEOM_NAME)
     {
@@ -308,7 +308,7 @@ class Document : public Element
         child->setType(type);
         if (!node.empty())
         {
-            child->setNode(node);
+            child->setNodeString(node);
         }
         return child;
     }
@@ -333,11 +333,6 @@ class Document : public Element
 
     /// Return a vector of all NodeDef elements that match the given node name.
     vector<NodeDefPtr> getMatchingNodeDefs(const string& nodeName) const;
-
-    /// Return a vector of all node implementations that match the given
-    /// NodeDef string.  Note that a node implementation may be either an
-    /// Implementation element or NodeGraph element.
-    vector<ElementPtr> getMatchingImplementations(const string& nodeDef) const;
 
     /// @}
     /// @name PropertySet Elements
@@ -402,6 +397,11 @@ class Document : public Element
     {
         removeChildOfType<Implementation>(name);
     }
+
+    /// Return a vector of all node implementations that match the given
+    /// NodeDef string.  Note that a node implementation may be either an
+    /// Implementation element or NodeGraph element.
+    vector<InterfaceElementPtr> getMatchingImplementations(const string& nodeDef) const;
 
     /// @}
     /// @name Public Elements
@@ -484,19 +484,6 @@ class Document : public Element
     {
         return getAttribute(CMS_CONFIG_ATTRIBUTE);
     }
-
-    /// @}
-    /// @name String Substitutions
-    /// @{
-
-    /// Return the map of filename string substitutions defined for the given geom.
-    StringMap getFilenameStringMap(const string& geom) const;
-
-    /// Given an input filename and geom string, apply any string substitutions
-    /// that have been defined for the given geom to the filename, returning the
-    /// modified filename.
-    string applyStringSubstitutions(const string& filename,
-                                    const string& geom = UNIVERSAL_GEOM_NAME) const;
 
     /// @}
     /// @name Validation

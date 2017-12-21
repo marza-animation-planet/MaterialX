@@ -40,9 +40,9 @@ TEST_CASE("Node", "[node]")
     REQUIRE_THROWS_AS(doc->addNodeGraph(nodeGraph->getName()), mx::Exception);
     mx::NodePtr constant = nodeGraph->addNode("constant");
     mx::NodePtr image = nodeGraph->addNode("image");
-    REQUIRE(nodeGraph->getChildrenOfType<mx::Node>().size() == 2);
-    REQUIRE(nodeGraph->getChildrenOfType<mx::Node>("constant").size() == 1);
-    REQUIRE(nodeGraph->getChildrenOfType<mx::Node>("image").size() == 1);
+    REQUIRE(nodeGraph->getNodes().size() == 2);
+    REQUIRE(nodeGraph->getNodes("constant").size() == 1);
+    REQUIRE(nodeGraph->getNodes("image").size() == 1);
 
     // Set constant node color.
     mx::Color3 color(0.1f, 0.2f, 0.3f);
@@ -52,8 +52,9 @@ TEST_CASE("Node", "[node]")
 
     // Set image node file.
     std::string file("image1.tif");
-    image->setParameterValue("file", file);
-    REQUIRE(image->getParameterValueString("file") == file);
+    image->setParameterValue("file", file, mx::FILENAME_TYPE_STRING);
+    REQUIRE(image->getParameterValue("file")->isA<std::string>());
+    REQUIRE(image->getParameterValue("file")->asA<std::string>() == file);
 
     // Create connected outputs.
     mx::OutputPtr output1 = nodeGraph->addOutput();
@@ -62,9 +63,20 @@ TEST_CASE("Node", "[node]")
     output2->setConnectedNode(image);
     REQUIRE(output1->getUpstreamElement() == constant);
     REQUIRE(output2->getUpstreamElement() == image);
+    REQUIRE(constant->getDownstreamPorts()[0] == output1);
+    REQUIRE(image->getDownstreamPorts()[0] == output2);
 
-    // Define and reference a custom type.
-    doc->addTypeDef("spectrum");
+    // Define a custom type.
+    mx::TypeDefPtr typeDef = doc->addTypeDef("spectrum");
+    const int scalarCount = 10;
+    for (int i = 0; i < scalarCount; i++)
+    {
+        mx::MemberPtr scalar = typeDef->addMember();
+        scalar->setType("float");
+    }
+    REQUIRE(typeDef->getMembers().size() == scalarCount);
+
+    // Reference the custom type.
     std::string d65("400.0,82.75,500.0,109.35,600.0,90.01,700.0,71.61,800.0,59.45");
     constant->setParameterValue<std::string>("value", d65, "spectrum");
     REQUIRE(constant->getParameter("value")->getType() == "spectrum");
@@ -77,6 +89,8 @@ TEST_CASE("Node", "[node]")
     output2->setConnectedNode(nullptr);
     REQUIRE(output1->getUpstreamElement() == nullptr);
     REQUIRE(output2->getUpstreamElement() == nullptr);
+    REQUIRE(constant->getDownstreamPorts().empty());
+    REQUIRE(image->getDownstreamPorts().empty());
 
     // Remove nodes and outputs.
     nodeGraph->removeNode(image->getName());
@@ -92,7 +106,7 @@ TEST_CASE("Node", "[node]")
 
 TEST_CASE("Flatten", "[nodegraph]")
 {
-    // Load the example file.
+    // Read the example file.
     mx::DocumentPtr doc = mx::createDocument();
     mx::readFromXmlFile(doc, "SubGraphs.mtlx", "documents/Examples;documents/Libraries");
 
@@ -125,7 +139,7 @@ TEST_CASE("Flatten", "[nodegraph]")
             totalNodeCount++;
 
             // Make sure it's an atomic node.
-            mx::ElementPtr implement = elem->asA<mx::Node>()->getImplementation();
+            mx::InterfaceElementPtr implement = elem->asA<mx::Node>()->getImplementation();
             bool isAtomic = !implement || !implement->isA<mx::NodeGraph>();
             REQUIRE(isAtomic);
         }
