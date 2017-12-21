@@ -7,7 +7,7 @@ env = excons.MakeBaseEnv()
 
 major = 1
 minor = 35
-patch = 3
+patch = 4
 
 
 bind_python = int(excons.GetArgument("materialx-bind-python", 1))
