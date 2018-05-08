@@ -18,14 +18,28 @@ namespace MaterialX
 
 /// A shared pointer to a Parameter
 using ParameterPtr = shared_ptr<class Parameter>;
+/// A shared pointer to a const Parameter
+using ConstParameterPtr = shared_ptr<const class Parameter>;
+
 /// A shared pointer to a PortElement
 using PortElementPtr = shared_ptr<class PortElement>;
+/// A shared pointer to a const PortElement
+using ConstPortElementPtr = shared_ptr<const class PortElement>;
+
 /// A shared pointer to an Input
 using InputPtr = shared_ptr<class Input>;
+/// A shared pointer to a const Input
+using ConstInputPtr = shared_ptr<const class Input>;
+
 /// A shared pointer to an Output
 using OutputPtr = shared_ptr<class Output>;
+/// A shared pointer to a const Output
+using ConstOutputPtr = shared_ptr<const class Output>;
+
 /// A shared pointer to an InterfaceElement
 using InterfaceElementPtr = shared_ptr<class InterfaceElement>;
+/// A shared pointer to a const InterfaceElement
+using ConstInterfaceElementPtr = shared_ptr<const class InterfaceElement>;
 
 /// @class Parameter
 /// A parameter element within a Node or NodeDef.
@@ -46,7 +60,7 @@ class Parameter : public ValueElement
 
     /// Return the Edge with the given index that lies directly upstream from
     /// this element in the dataflow graph.
-    Edge getUpstreamEdge(ConstMaterialPtr material = ConstMaterialPtr(),
+    Edge getUpstreamEdge(ConstMaterialPtr material = nullptr,
                          size_t index = 0) const override;
 
     /// Return the number of queriable upstream edges for this element.
@@ -187,16 +201,13 @@ class Input : public PortElement
     }
     virtual ~Input() { }
 
-  protected:
-    using NodePtr = shared_ptr<class Node>;
-
   public:
     /// @name Traversal
     /// @{
 
     /// Return the Edge with the given index that lies directly upstream from
     /// this element in the dataflow graph.
-    Edge getUpstreamEdge(ConstMaterialPtr material = ConstMaterialPtr(),
+    Edge getUpstreamEdge(ConstMaterialPtr material = nullptr,
                          size_t index = 0) const override;
 
     /// Return the number of queriable upstream edges for this element.
@@ -222,16 +233,13 @@ class Output : public PortElement
     }
     virtual ~Output() { }
 
-  protected:
-    using NodePtr = shared_ptr<class Node>;
-
   public:
     /// @name Traversal
     /// @{
 
     /// Return the Edge with the given index that lies directly upstream from
     /// this element in the dataflow graph.
-    Edge getUpstreamEdge(ConstMaterialPtr material = ConstMaterialPtr(),
+    Edge getUpstreamEdge(ConstMaterialPtr material = nullptr,
                          size_t index = 0) const override;
 
     /// Return the number of queriable upstream edges for this element.
@@ -276,7 +284,7 @@ class InterfaceElement : public TypedElement
     virtual ~InterfaceElement() { }
 
   protected:
-    using NodePtr = shared_ptr<class Node>;
+    using NodeDefPtr = shared_ptr<class NodeDef>;
 
   public:
     /// @name Parameters
@@ -412,11 +420,15 @@ class InterfaceElement : public TypedElement
                                                      const T& value,
                                                      const string& type = EMPTY_STRING);
 
-    /// Return the typed value of a parameter by its name.
+    /// Return the typed value of a parameter by its name, taking both the
+    /// calling element and its declaration into account.
     /// @param name The name of the parameter to be evaluated.
-    /// @return If the given parameter is present, then a shared pointer to its
-    ///    value is returned; otherwise, an empty shared pointer is returned.
-    ValuePtr getParameterValue(const string& name) const;
+    /// @param target An optional target name, which will be used to filter
+    ///    the declarations that are considered.
+    /// @return If the given parameter is found in this interface or its
+    ///    declaration, then a shared pointer to its value is returned;
+    ///    otherwise, an empty shared pointer is returned.
+    ValuePtr getParameterValue(const string& name, const string& target = EMPTY_STRING) const;
 
     /// Set the typed value of an input by its name, creating a child element
     /// to hold the input if needed.
@@ -424,15 +436,27 @@ class InterfaceElement : public TypedElement
                                              const T& value,
                                              const string& type = EMPTY_STRING);
 
-    /// Return the typed value of an input by its name.
+    /// Return the typed value of an input by its name, taking both the calling
+    /// element and its declaration into account.
     /// @param name The name of the input to be evaluated.
-    /// @return If the given input is present, then a shared pointer to its
-    ///    value is returned; otherwise, an empty shared pointer is returned.
-    ValuePtr getInputValue(const string& name) const;
+    /// @param target An optional target name, which will be used to filter
+    ///    the declarations that are considered.
+    /// @return If the given parameter is found in this interface or its
+    ///    declaration, then a shared pointer to its value is returned;
+    ///    otherwise, an empty shared pointer is returned.
+    ValuePtr getInputValue(const string& name, const string& target = EMPTY_STRING) const;
 
     /// @}
     /// @name Utility
     /// @{
+
+    /// Return the first declaration of this interface, optionally filtered
+    ///    by the given target name.
+    /// @param target An optional target name, which will be used to filter
+    ///    the declarations that are considered.
+    /// @return A shared pointer to nodedef, or an empty shared pointer if
+    ///    no declaration was found.
+    NodeDefPtr getDeclaration(const string& target = EMPTY_STRING) const;
 
     /// Return true if the given interface element is type compatible with
     /// this one.  This may be used to test, for example, whether a NodeDef

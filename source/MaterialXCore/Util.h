@@ -14,11 +14,6 @@
 namespace MaterialX
 {
 
-extern const int MAJOR_VERSION;
-extern const int MINOR_VERSION;
-extern const int BUILD_VERSION;
-
-extern const string LIBRARY_VERSION_STRING;
 extern const string EMPTY_STRING;
 
 using ElementPtr = shared_ptr<class Element>;
@@ -50,10 +45,6 @@ string replaceSubstrings(string str, const StringMap& stringMap);
 /// Pretty print the given element tree, calling asString recursively on each
 /// element in depth-first order.
 string prettyPrint(ElementPtr elem);
-
-/// Print the given nodegraph in a DOT language syntax.  This can be used to
-/// visualise the graph using GraphViz (http://www.graphviz.org).
-string printGraphDot(NodeGraphPtr graph);
 
 } // namespace MaterialX
 

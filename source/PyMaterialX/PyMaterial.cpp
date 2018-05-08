@@ -9,8 +9,6 @@
 
 #include <MaterialXCore/Look.h>
 
-#include <PyBind11/stl.h>
-
 namespace py = pybind11;
 namespace mx = MaterialX;
 
@@ -24,10 +22,12 @@ void bindPyMaterial(py::module& mod)
             py::arg("name") = mx::EMPTY_STRING, py::arg("node") = mx::EMPTY_STRING)
         .def("getShaderRef", &mx::Material::getShaderRef)
         .def("getShaderRefs", &mx::Material::getShaderRefs)
+        .def("getActiveShaderRefs", &mx::Material::getActiveShaderRefs)
         .def("removeShaderRef", &mx::Material::removeShaderRef)
         .def("_addOverride", &mx::Material::addOverride)
         .def("getOverride", &mx::Material::getOverride)
         .def("getOverrides", &mx::Material::getOverrides)
+        .def("getActiveOverrides", &mx::Material::getActiveOverrides)
         .def("removeOverride", &mx::Material::removeOverride)
         .def("addMaterialInherit", &mx::Material::addMaterialInherit,
             py::arg("name") = mx::EMPTY_STRING)
@@ -47,8 +47,6 @@ void bindPyMaterial(py::module& mod)
             py::arg("target") = mx::EMPTY_STRING, py::arg("type") = mx::EMPTY_STRING)
         .def("getBoundGeomStrings", &mx::Material::getBoundGeomStrings)
         .def("getBoundGeomCollections", &mx::Material::getBoundGeomCollections)
-        .def("setInheritsFrom", &mx::Material::setInheritsFrom)
-        .def("getInheritsFrom", &mx::Material::getInheritsFrom)
         BIND_MATERIAL_FUNC_INSTANCE(integer, int)
         BIND_MATERIAL_FUNC_INSTANCE(boolean, bool)
         BIND_MATERIAL_FUNC_INSTANCE(float, float)
@@ -58,8 +56,8 @@ void bindPyMaterial(py::module& mod)
         BIND_MATERIAL_FUNC_INSTANCE(vector2, mx::Vector2)
         BIND_MATERIAL_FUNC_INSTANCE(vector3, mx::Vector3)
         BIND_MATERIAL_FUNC_INSTANCE(vector4, mx::Vector4)
-        BIND_MATERIAL_FUNC_INSTANCE(matrix33, mx::Matrix3x3)
-        BIND_MATERIAL_FUNC_INSTANCE(matrix44, mx::Matrix4x4)
+        BIND_MATERIAL_FUNC_INSTANCE(matrix33, mx::Matrix33)
+        BIND_MATERIAL_FUNC_INSTANCE(matrix44, mx::Matrix44)
         BIND_MATERIAL_FUNC_INSTANCE(string, std::string)
         .def_readonly_static("CATEGORY", &mx::Material::CATEGORY);
 

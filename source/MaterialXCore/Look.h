@@ -19,12 +19,23 @@ namespace MaterialX
 
 /// A shared pointer to a Look
 using LookPtr = shared_ptr<class Look>;
+/// A shared pointer to a const Look
+using ConstLookPtr = shared_ptr<const class Look>;
+
 /// A shared pointer to a LookInherit
 using LookInheritPtr = shared_ptr<class LookInherit>;
+/// A shared pointer to a const LookInherit
+using ConstLookInheritPtr = shared_ptr<const class LookInherit>;
+
 /// A shared pointer to a MaterialAssign
 using MaterialAssignPtr = shared_ptr<class MaterialAssign>;
+/// A shared pointer to a const MaterialAssign
+using ConstMaterialAssignPtr = shared_ptr<const class MaterialAssign>;
+
 /// A shared pointer to a Visibility
 using VisibilityPtr = shared_ptr<class Visibility>;
+/// A shared pointer to a const Visibility
+using ConstVisibilityPtr = shared_ptr<const class Visibility>;
 
 /// @class Look
 /// A look element within a Document.
@@ -36,6 +47,150 @@ class Look : public Element
     {
     }
     virtual ~Look() { }
+
+    /// @}
+    /// @name MaterialAssign Elements
+    /// @{
+
+    /// Add a MaterialAssign to the look.
+    /// @param name The name of the new MaterialAssign.
+    ///     If no name is specified, then a unique name will automatically be
+    ///     generated.
+    /// @param material An optional material string, which should match the
+    ///     name of the Material element to be assigned.
+    /// @return A shared pointer to the new MaterialAssign.
+    MaterialAssignPtr addMaterialAssign(const string& name = EMPTY_STRING,
+                                        const string& material = EMPTY_STRING);
+
+    /// Return the MaterialAssign, if any, with the given name.
+    MaterialAssignPtr getMaterialAssign(const string& name) const
+    {
+        return getChildOfType<MaterialAssign>(name);
+    }
+
+    /// Return a vector of all MaterialAssign elements in the look.
+    vector<MaterialAssignPtr> getMaterialAssigns() const
+    {
+        return getChildrenOfType<MaterialAssign>();
+    }
+
+    /// Return a vector of all MaterialAssign elements that belong to this look,
+    /// taking look inheritance into account.
+    vector<MaterialAssignPtr> getActiveMaterialAssigns() const;
+
+    /// Remove the MaterialAssign, if any, with the given name.
+    void removeMaterialAssign(const string& name)
+    {
+        removeChildOfType<MaterialAssign>(name);
+    }
+
+    /// @}
+    /// @name PropertyAssign Elements
+    /// @{
+
+    /// Add a PropertyAssign to the look.
+    /// @param name The name of the new PropertyAssign.
+    ///     If no name is specified, then a unique name will automatically be
+    ///     generated.
+    /// @return A shared pointer to the new PropertyAssign.
+    PropertyAssignPtr addPropertyAssign(const string& name = EMPTY_STRING)
+    {
+        return addChild<PropertyAssign>(name);
+    }
+
+    /// Return the PropertyAssign, if any, with the given name.
+    PropertyAssignPtr getPropertyAssign(const string& name) const
+    {
+        return getChildOfType<PropertyAssign>(name);
+    }
+
+    /// Return a vector of all PropertyAssign elements in the look.
+    vector<PropertyAssignPtr> getPropertyAssigns() const
+    {
+        return getChildrenOfType<PropertyAssign>();
+    }
+
+    /// Return a vector of all PropertyAssign elements that belong to this look,
+    /// taking look inheritance into account.
+    vector<PropertyAssignPtr> getActivePropertyAssigns() const;
+
+    /// Remove the PropertyAssign, if any, with the given name.
+    void removePropertyAssign(const string& name)
+    {
+        removeChildOfType<PropertyAssign>(name);
+    }
+
+    /// @}
+    /// @name PropertySetAssign Elements
+    /// @{
+
+    /// Add a PropertySetAssign to the look.
+    /// @param name The name of the new PropertySetAssign.
+    ///     If no name is specified, then a unique name will automatically be
+    ///     generated.
+    /// @return A shared pointer to the new PropertySetAssign.
+    PropertySetAssignPtr addPropertySetAssign(const string& name = EMPTY_STRING)
+    {
+        return addChild<PropertySetAssign>(name);
+    }
+
+    /// Return the PropertySetAssign, if any, with the given name.
+    PropertySetAssignPtr getPropertySetAssign(const string& name) const
+    {
+        return getChildOfType<PropertySetAssign>(name);
+    }
+
+    /// Return a vector of all PropertySetAssign elements in the look.
+    vector<PropertySetAssignPtr> getPropertySetAssigns() const
+    {
+        return getChildrenOfType<PropertySetAssign>();
+    }
+
+    /// Return a vector of all PropertySetAssign elements that belong to this look,
+    /// taking look inheritance into account.
+    vector<PropertySetAssignPtr> getActivePropertySetAssigns() const;
+
+    /// Remove the PropertySetAssign, if any, with the given name.
+    void removePropertySetAssign(const string& name)
+    {
+        removeChildOfType<PropertySetAssign>(name);
+    }
+
+    /// @}
+    /// @name Visibility Elements
+    /// @{
+
+    /// Add a Visibility to the look.
+    /// @param name The name of the new Visibility.
+    ///     If no name is specified, then a unique name will automatically be
+    ///     generated.
+    /// @return A shared pointer to the new Visibility.
+    VisibilityPtr addVisibility(const string& name = EMPTY_STRING)
+    {
+        return addChild<Visibility>(name);
+    }
+
+    /// Return the Visibility, if any, with the given name.
+    VisibilityPtr getVisibility(const string& name) const
+    {
+        return getChildOfType<Visibility>(name);
+    }
+
+    /// Return a vector of all Visibility elements in the look.
+    vector<VisibilityPtr> getVisibilities() const
+    {
+        return getChildrenOfType<Visibility>();
+    }
+
+    /// Return a vector of all Visibility elements that belong to this look,
+    /// taking look inheritance into account.
+    vector<VisibilityPtr> getActiveVisibilities() const;
+
+    /// Remove the Visibility, if any, with the given name.
+    void removeVisibility(const string& name)
+    {
+        removeChildOfType<Visibility>(name);
+    }
 
     /// @}
     /// @name LookInherit Elements
@@ -70,144 +225,14 @@ class Look : public Element
     }
 
     /// @}
-    /// @name MaterialAssign Elements
+    /// @name Inheritance
     /// @{
 
-    /// Add a MaterialAssign to the look.
-    /// @param name The name of the new MaterialAssign.
-    ///     If no name is specified, then a unique name will automatically be
-    ///     generated.
-    /// @param material An optional material string, which should match the
-    ///     name of the Material element to be assigned.
-    /// @return A shared pointer to the new MaterialAssign.
-    MaterialAssignPtr addMaterialAssign(const string& name = EMPTY_STRING,
-                                        const string& material = EMPTY_STRING);
+    /// Set the look element that this one inherits from.
+    void setInheritsFrom(ElementPtr look) override;
 
-    /// Return the MaterialAssign, if any, with the given name.
-    MaterialAssignPtr getMaterialAssign(const string& name) const
-    {
-        return getChildOfType<MaterialAssign>(name);
-    }
-
-    /// Return a vector of all MaterialAssign elements in the look.
-    vector<MaterialAssignPtr> getMaterialAssigns() const
-    {
-        return getChildrenOfType<MaterialAssign>();
-    }
-
-    /// Remove the MaterialAssign, if any, with the given name.
-    void removeMaterialAssign(const string& name)
-    {
-        removeChildOfType<MaterialAssign>(name);
-    }
-
-    /// @}
-    /// @name PropertyAssign Elements
-    /// @{
-
-    /// Add a PropertyAssign to the look.
-    /// @param name The name of the new PropertyAssign.
-    ///     If no name is specified, then a unique name will automatically be
-    ///     generated.
-    /// @return A shared pointer to the new PropertyAssign.
-    PropertyAssignPtr addPropertyAssign(const string& name = EMPTY_STRING)
-    {
-        return addChild<PropertyAssign>(name);
-    }
-
-    /// Return the PropertyAssign, if any, with the given name.
-    PropertyAssignPtr getPropertyAssign(const string& name) const
-    {
-        return getChildOfType<PropertyAssign>(name);
-    }
-
-    /// Return a vector of all PropertyAssign elements in the look.
-    vector<PropertyAssignPtr> getPropertyAssigns() const
-    {
-        return getChildrenOfType<PropertyAssign>();
-    }
-
-    /// Remove the PropertyAssign, if any, with the given name.
-    void removePropertyAssign(const string& name)
-    {
-        removeChildOfType<PropertyAssign>(name);
-    }
-
-    /// @}
-    /// @name PropertySetAssign Elements
-    /// @{
-
-    /// Add a PropertySetAssign to the look.
-    /// @param name The name of the new PropertySetAssign.
-    ///     If no name is specified, then a unique name will automatically be
-    ///     generated.
-    /// @return A shared pointer to the new PropertySetAssign.
-    PropertySetAssignPtr addPropertySetAssign(const string& name = EMPTY_STRING)
-    {
-        return addChild<PropertySetAssign>(name);
-    }
-
-    /// Return the PropertySetAssign, if any, with the given name.
-    PropertySetAssignPtr getPropertySetAssign(const string& name) const
-    {
-        return getChildOfType<PropertySetAssign>(name);
-    }
-
-    /// Return a vector of all PropertySetAssign elements in the look.
-    vector<PropertySetAssignPtr> getPropertySetAssigns() const
-    {
-        return getChildrenOfType<PropertySetAssign>();
-    }
-
-    /// Remove the PropertySetAssign, if any, with the given name.
-    void removePropertySetAssign(const string& name)
-    {
-        removeChildOfType<PropertySetAssign>(name);
-    }
-
-    /// @}
-    /// @name Visibility Elements
-    /// @{
-
-    /// Add a Visibility to the look.
-    /// @param name The name of the new Visibility.
-    ///     If no name is specified, then a unique name will automatically be
-    ///     generated.
-    /// @return A shared pointer to the new Visibility.
-    VisibilityPtr addVisibility(const string& name = EMPTY_STRING)
-    {
-        return addChild<Visibility>(name);
-    }
-
-    /// Return the Visibility, if any, with the given name.
-    VisibilityPtr getVisibility(const string& name) const
-    {
-        return getChildOfType<Visibility>(name);
-    }
-
-    /// Return a vector of all Visibility elements in the look.
-    vector<VisibilityPtr> getVisibilities() const
-    {
-        return getChildrenOfType<Visibility>();
-    }
-
-    /// Remove the Visibility, if any, with the given name.
-    void removeVisibility(const string& name)
-    {
-        removeChildOfType<Visibility>(name);
-    }
-
-    /// @}
-    /// @name Look Inheritance
-    /// @{
-
-    /// Clear any existing look inheritance, and mark this look as
-    /// inheriting the given look.  If the given pointer is empty, then
-    /// this look is marked as not inheriting from any look.
-    void setInheritsFrom(LookPtr look);
-
-    /// Return the look, if any, that this look inherits from.
-    LookPtr getInheritsFrom() const;
+    /// Return the look element, if any, that this one inherits from.
+    ElementPtr getInheritsFrom() const override;
 
     /// @}
 

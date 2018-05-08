@@ -14,6 +14,7 @@ const Edge NULL_EDGE(nullptr, nullptr, nullptr);
 
 const TreeIterator NULL_TREE_ITERATOR(nullptr);
 const GraphIterator NULL_GRAPH_ITERATOR(nullptr, nullptr);
+const InheritanceIterator NULL_INHERITANCE_ITERATOR(nullptr);
 const AncestorIterator NULL_ANCESTOR_ITERATOR(nullptr);
 
 //
@@ -179,6 +180,39 @@ void GraphIterator::returnPathDownstream(ElementPtr upstreamElem)
 }
 
 //
+// InheritanceIterator methods
+//
+
+const InheritanceIterator& InheritanceIterator::end()
+{
+    return NULL_INHERITANCE_ITERATOR;
+}
+
+InheritanceIterator& InheritanceIterator::operator++()
+{
+    if (_holdCount)
+    {
+        _holdCount--;
+        return *this;
+    }
+
+    if (_elem)
+    {
+        ElementPtr super = _elem->getInheritsFrom();
+
+        // Check for cycles.
+        if (_pathElems.count(super))
+        {
+            throw ExceptionFoundCycle("Encountered cycle at element: " + super->asString());
+        }
+
+        _elem = super;
+        _pathElems.insert(super);
+    }
+    return *this;
+}
+
+//
 // AncestorIterator methods
 //
 
@@ -195,7 +229,10 @@ AncestorIterator& AncestorIterator::operator++()
         return *this;
     }
 
-    _elem = _elem->getParent();
+    if (_elem)
+    {
+        _elem = _elem->getParent();
+    }
     return *this;
 }
 

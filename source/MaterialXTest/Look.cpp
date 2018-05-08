@@ -14,8 +14,9 @@ TEST_CASE("Look", "[look]")
     mx::DocumentPtr doc = mx::createDocument();
 
     // Create a material and look.
-    mx::MaterialPtr material = doc->addMaterial("material1");
-    mx::LookPtr look = doc->addLook("look1");
+    mx::MaterialPtr material = doc->addMaterial();
+    mx::ShaderRefPtr shaderRef = material->addShaderRef();
+    mx::LookPtr look = doc->addLook();
     REQUIRE(doc->getMaterials().size() == 1);
     REQUIRE(doc->getLooks().size() == 1);
 
@@ -45,17 +46,18 @@ TEST_CASE("Look", "[look]")
 
     // Create a property set assignment.
     mx::PropertySetPtr propertySet = doc->addPropertySet();
-    REQUIRE(doc->getPropertySets().size() == 1);
-    mx::PropertyPtr property = propertySet->addProperty("matte");
-    property->setValue(false);
-    REQUIRE(property->getValue()->isA<bool>());
-    REQUIRE(property->getValue()->asA<bool>() == false);
+    propertySet->setPropertyValue("matte", false);
+    REQUIRE(propertySet->getPropertyValue("matte")->isA<bool>());
+    REQUIRE(propertySet->getPropertyValue("matte")->asA<bool>() == false);
     mx::PropertySetAssignPtr propertySetAssign = look->addPropertySetAssign(propertySet->getName());
-    REQUIRE(look->getPropertySetAssigns().size() == 1);
+    propertySetAssign->setGeom("/robot1");
+    REQUIRE(propertySetAssign->getGeom() == "/robot1");
 
     // Create a visibility element.
     mx::VisibilityPtr visibility = look->addVisibility();
-    REQUIRE(look->getVisibilities().size() == 1);
+    REQUIRE(visibility->getVisible() == false);
+    visibility->setVisible(true);
+    REQUIRE(visibility->getVisible() == true);
     visibility->setGeom("/robot2");
     REQUIRE(visibility->getGeom() == "/robot2");
     visibility->setCollection(collection);
@@ -64,8 +66,19 @@ TEST_CASE("Look", "[look]")
     // Create an inherited look.
     mx::LookPtr look2 = doc->addLook();
     look2->setInheritsFrom(look);
-    REQUIRE(look2->getInheritsFrom() == look);
+    REQUIRE(look2->getActiveMaterialAssigns().size() == 2);
+    REQUIRE(look2->getActivePropertySetAssigns().size() == 1);
+    REQUIRE(look2->getActiveVisibilities().size() == 1);
+
+    // Create and detect an inheritance cycle.
+    look->setInheritsFrom(look2);
+    REQUIRE(!doc->validate());
+    look->setInheritsFrom(nullptr);
+    REQUIRE(doc->validate());
+
+    // Disconnect the inherited look.
     look2->setInheritsFrom(nullptr);
-    REQUIRE(look2->getInheritsFrom() == nullptr);
-    REQUIRE(look2->getLookInherits().empty());
+    REQUIRE(look2->getActiveMaterialAssigns().empty());
+    REQUIRE(look2->getActivePropertySetAssigns().empty());
+    REQUIRE(look2->getActiveVisibilities().empty());
 }

@@ -18,8 +18,6 @@
 namespace MaterialX
 {
 
-extern const string DOCUMENT_VERSION_STRING;
-
 /// A shared pointer to a Document
 using DocumentPtr = shared_ptr<class Document>;
 /// A shared pointer to a const Document
@@ -51,7 +49,9 @@ class Document : public Element
     virtual DocumentPtr copy()
     {
         DocumentPtr doc = createDocument<Document>();
-        doc->copyContentFrom(getSelf(), true);
+        CopyOptions copyOptions;
+        copyOptions.copySourceUris = true;
+        doc->copyContentFrom(getSelf(), &copyOptions);
         return doc;
     }
 
@@ -59,7 +59,10 @@ class Document : public Element
     /// The contents of the library document are copied into this one, and
     /// are assigned the source URI of the library.
     /// @param library The library document to be imported.
-    void importLibrary(ConstDocumentPtr library);
+    /// @param copyOptions An optional pointer to a CopyOptions object.
+    ///    If provided, then the given options will affect the behavior of the
+    ///    import function.  Defaults to a null pointer.
+    void importLibrary(ConstDocumentPtr library, const class CopyOptions* copyOptions = nullptr);
 
     /// @name Document Versions
     /// @{
@@ -502,6 +505,12 @@ class Document : public Element
     /// @name Callbacks
     /// @{
 
+    /// Enable all observer callbacks		
+    virtual void enableCallbacks() { }
+    
+    /// Disable all observer callbacks
+    virtual void disableCallbacks() { }
+
     /// Called when an element is added to the element tree.
     virtual void onAddElement(ElementPtr parent, ElementPtr elem);
 
@@ -546,15 +555,15 @@ class Document : public Element
     std::unique_ptr<Cache> _cache;
 };
 
-/// @class @ScopedUpdate
+/// @class ScopedUpdate
 /// An RAII class for Document updates.
 ///
 /// A ScopedUpdate instance calls Document::onBeginUpdate when created, and
 /// Document::onEndUpdate when destroyed.
 class ScopedUpdate
 {
-    public:
-    ScopedUpdate(DocumentPtr doc) :
+  public:
+    explicit ScopedUpdate(DocumentPtr doc) :
         _doc(doc)
     {
         _doc->onBeginUpdate();
@@ -564,7 +573,29 @@ class ScopedUpdate
         _doc->onEndUpdate();
     }
 
-    private:
+  private:
+    DocumentPtr _doc;
+};
+
+/// @class ScopedDisableCallbacks
+/// An RAII class for disabling Document callbacks.
+///
+/// A ScopedDisableCallbacks instance calls Document::disableCallbacks() when
+/// created, and Document::enableCallbacks when destroyed.
+class ScopedDisableCallbacks
+{
+  public:
+    explicit ScopedDisableCallbacks(DocumentPtr doc) :
+        _doc(doc)
+    {
+        _doc->disableCallbacks();
+    }
+    ~ScopedDisableCallbacks()
+    {
+        _doc->enableCallbacks();
+    }
+
+  private:
     DocumentPtr _doc;
 };
 

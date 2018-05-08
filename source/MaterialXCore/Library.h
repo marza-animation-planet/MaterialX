@@ -26,7 +26,6 @@ using std::string;
 using std::vector;
 using std::shared_ptr;
 using std::weak_ptr;
-using std::enable_shared_from_this;
 
 /// A vector of strings.
 using StringVec = vector<string>;
@@ -35,13 +34,13 @@ using StringMap = std::unordered_map<string, string>;
 /// A set of strings.
 using StringSet = std::set<string>;
 
-/// @class @Exception
+/// @class Exception
 /// The base class for exceptions that are propagated from the MaterialX library
 /// to the client application.
 class Exception : public std::exception
 {
   public:
-    Exception(const string& msg) :
+    explicit Exception(const string& msg) :
         std::exception(),
         _msg(msg)
     {

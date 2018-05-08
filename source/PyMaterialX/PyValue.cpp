@@ -7,15 +7,12 @@
 
 #include <MaterialXCore/Value.h>
 
-#include <PyBind11/stl.h>
-
 #define BIND_TYPE_INSTANCE(NAME, T)                                                                         \
 py::class_<mx::TypedValue<T>, std::shared_ptr< mx::TypedValue<T> >, mx::Value>(mod, "TypedValue_" #NAME)    \
     .def("getData", &mx::TypedValue<T>::getData)                                                            \
     .def("getValueString", &mx::TypedValue<T>::getValueString)                                              \
     .def_static("createValue", &mx::Value::createValue<T>)                                                  \
-    .def_readonly_static("TYPE", &mx::TypedValue<T>::TYPE)                                                  \
-    .def_readonly_static("ZERO", &mx::TypedValue<T>::ZERO);
+    .def_readonly_static("TYPE", &mx::TypedValue<T>::TYPE);
 
 namespace py = pybind11;
 namespace mx = MaterialX;
@@ -36,7 +33,7 @@ void bindPyValue(py::module& mod)
     BIND_TYPE_INSTANCE(vector2, mx::Vector2)
     BIND_TYPE_INSTANCE(vector3, mx::Vector3)
     BIND_TYPE_INSTANCE(vector4, mx::Vector4)
-    BIND_TYPE_INSTANCE(matrix33, mx::Matrix3x3)
-    BIND_TYPE_INSTANCE(matrix44, mx::Matrix4x4)
+    BIND_TYPE_INSTANCE(matrix33, mx::Matrix33)
+    BIND_TYPE_INSTANCE(matrix44, mx::Matrix44)
     BIND_TYPE_INSTANCE(string, std::string)
 }

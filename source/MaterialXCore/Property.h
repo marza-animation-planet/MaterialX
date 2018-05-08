@@ -18,12 +18,23 @@ namespace MaterialX
 
 /// A shared pointer to a Property
 using PropertyPtr = shared_ptr<class Property>;
+/// A shared pointer to a const Property
+using ConstPropertyPtr = shared_ptr<const class Property>;
+
 /// A shared pointer to a PropertyAssign
 using PropertyAssignPtr = shared_ptr<class PropertyAssign>;
+/// A shared pointer to a const PropertyAssign
+using ConstPropertyAssignPtr = shared_ptr<const class PropertyAssign>;
+
 /// A shared pointer to a PropertySet
 using PropertySetPtr = shared_ptr<class PropertySet>;
+/// A shared pointer to a const PropertySet
+using ConstPropertySetPtr = shared_ptr<const class PropertySet>;
+
 /// A shared pointer to a PropertySetAssign
 using PropertySetAssignPtr = shared_ptr<class PropertySetAssign>;
+/// A shared pointer to a const PropertySetAssign
+using ConstPropertySetAssignPtr = shared_ptr<const class PropertySetAssign>;
 
 /// @class Property
 /// A property element within a PropertySet.
@@ -95,7 +106,7 @@ class PropertyAssign : public ValueElement
     }
 
     /// Assign a Collection to this element.
-    void setCollection(CollectionPtr collection);
+    void setCollection(ConstCollectionPtr collection);
 
     /// Return the Collection that is assigned to this element.
     CollectionPtr getCollection() const;
@@ -119,6 +130,9 @@ class PropertySet : public Element
     }
     virtual ~PropertySet() { }
 
+    /// @name Properties
+    /// @{
+
     /// Add a Property to the set.
     /// @param name The name of the new Property.
     ///     If no name is specified, then a unique name will automatically be
@@ -126,9 +140,6 @@ class PropertySet : public Element
     /// @return A shared pointer to the new Property.
     PropertyPtr addProperty(const string& name)
     {
-        PropertyPtr assignPtr = getChildOfType<Property>(name);
-        if (assignPtr)
-            return assignPtr;
         return addChild<Property>(name);
     }
 
@@ -150,7 +161,36 @@ class PropertySet : public Element
         removeChildOfType<Property>(name);
     }
 
-  public:
+    /// @}
+    /// @name Values
+    /// @{
+
+    /// Set the typed value of a property by its name, creating a child element
+    /// to hold the property if needed.
+    template<class T> PropertyPtr setPropertyValue(const string& name,
+                                                   const T& value,
+                                                   const string& type = EMPTY_STRING)
+    {
+        PropertyPtr property = getChildOfType<Property>(name);
+        if (!property)
+            property = addProperty(name);
+        property->setValue(value, type);
+        return property;
+    }
+
+    /// Return the typed value of a property by its name.
+    /// @param name The name of the property to be evaluated.
+    /// @return If the given property is found, then a shared pointer to its
+    ///    value is returned; otherwise, an empty shared pointer is returned.
+    ValuePtr getPropertyValue(const string& name) const
+    {
+        PropertyPtr property = getProperty(name);
+        return property ? property->getValue() : ValuePtr();
+    }
+
+    /// @}
+
+public:
     static const string CATEGORY;
 };
 

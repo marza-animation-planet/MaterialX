@@ -47,7 +47,7 @@ using ElementPredicate = std::function<bool(ElementPtr)>;
 ///
 /// An Element is a named object within a Document, which may possess any
 /// number of child elements and attributes.
-class Element : public enable_shared_from_this<Element>
+class Element : public std::enable_shared_from_this<Element>
 {
   protected:
     Element(ElementPtr parent, const string& category, const string& name) :
@@ -115,7 +115,15 @@ class Element : public enable_shared_from_this<Element>
     /// separated by forward slashes.
     /// @param relativeTo If a valid ancestor element is specified, then
     ///    the returned path will be relative to this ancestor.
-    string getNamePath(ConstElementPtr relativeTo = ConstElementPtr()) const;
+    string getNamePath(ConstElementPtr relativeTo = nullptr) const;
+
+    /// Return the descendant referred to by the hierarchical path relative
+    /// to the current element. If an empty string is provided as the path
+    /// then a shared pointer to the current element is returned. If the
+    /// path cannot be found then an empty shared pointer is returned.
+    /// @param path The hierarchical path to use to find a descendant
+    ///    relative to the current element.
+    ElementPtr getDescendant(const string& path);
 
     /// @}
     /// @name File Prefix
@@ -139,7 +147,8 @@ class Element : public enable_shared_from_this<Element>
         return getAttribute(FILE_PREFIX_ATTRIBUTE);
     }
 
-    /// Return the active file prefix string at the scope of this element.
+    /// Return the file prefix string that is active at the scope of this
+    /// element, taking all ancestor elements into account.
     const string& getActiveFilePrefix() const
     {
         for (ConstElementPtr elem : traverseAncestors())
@@ -174,7 +183,8 @@ class Element : public enable_shared_from_this<Element>
         return getAttribute(GEOM_PREFIX_ATTRIBUTE);
     }
 
-    /// Return the active geom prefix string at the scope of this element.
+    /// Return the geom prefix string that is active at the scope of this
+    /// element, taking all ancestor elements into account.
     const string& getActiveGeomPrefix() const
     {
         for (ConstElementPtr elem : traverseAncestors())
@@ -209,7 +219,8 @@ class Element : public enable_shared_from_this<Element>
         return getAttribute(COLOR_SPACE_ATTRIBUTE);
     }
 
-    /// Return the active color space string at the scope of this element.
+    /// Return the color space string that is active at the scope of this
+    /// element, taking all ancestor elements into account.
     const string& getActiveColorSpace() const
     {
         for (ConstElementPtr elem : traverseAncestors())
@@ -389,18 +400,24 @@ class Element : public enable_shared_from_this<Element>
     /// Set the value of an implicitly typed attribute.  Since an attribute
     /// stores no explicit type, the same type argument must be used in
     /// corresponding calls to getTypedAttribute.
-    template<class T> void setTypedAttribute(const string& attrib, const T& value)
+    template<class T> void setTypedAttribute(const string& attrib, const T& data)
     {
-        setAttribute(attrib, Value::createValue(value)->getValueString());
+        setAttribute(attrib, toValueString(data));
     }
 
     /// Return the the value of an implicitly typed attribute.  If the given
     /// attribute is not present, or cannot be converted to the given data
-    /// type, then the zero value for the given data type is returned.
+    /// type, then the zero value for the data type is returned.
     template<class T> const T getTypedAttribute(const string& attrib) const
     {
-        ValuePtr value = Value::createValueFromStrings(getAttribute(attrib), getTypeString<T>());
-        return value->asA<T>();
+        try
+        {
+            return fromValueString<T>(getAttribute(attrib));
+        }
+        catch (ExceptionTypeError&)
+        {
+        }
+        return {};
     }
 
     /// Remove the given attribute, if present.
@@ -453,6 +470,23 @@ class Element : public enable_shared_from_this<Element>
     }
 
     /// @}
+    /// @name Inheritance
+    /// @{
+
+    /// Set the element that this one inherits from, if inheritance is
+    /// supported by this element subclass.
+    virtual void setInheritsFrom(ElementPtr elem) { };
+
+    /// Return the element, if any, that this one inherits from.
+    virtual ElementPtr getInheritsFrom() const
+    {
+        return nullptr;
+    }
+
+    /// Return true if the inheritance chain for this element contains a cycle.
+    bool hasInheritanceCycle() const;
+
+    /// @}
     /// @name Traversal
     /// @{
 
@@ -461,14 +495,14 @@ class Element : public enable_shared_from_this<Element>
     /// @return A TreeIterator object.
     /// @details Example usage with an implicit iterator:
     /// @code
-    /// for (ElementPtr elem : doc->traverseTree())
+    /// for (ElementPtr elem : inputElem->traverseTree())
     /// {
     ///     cout << elem->asString() << endl;
     /// }
     /// @endcode
     /// Example usage with an explicit iterator:
     /// @code
-    /// for (mx::TreeIterator it = doc->traverseTree().begin(); it != mx::TreeIterator::end(); ++it)
+    /// for (mx::TreeIterator it = inputElem->traverseTree().begin(); it != mx::TreeIterator::end(); ++it)
     /// {
     ///     mx::ElementPtr elem = it.getElement();
     ///     cout << elem->asString() << " at depth " << it.getElementDepth() << endl;
@@ -480,27 +514,28 @@ class Element : public enable_shared_from_this<Element>
     /// upstream sources in depth-first order, using pre-order visitation.
     /// @param material An optional material element, whose data bindings and
     ///    overrides will be applied to the traversal.
+    /// @throws ExceptionFoundCycle if a cycle is encountered.
     /// @return A GraphIterator object.
     /// @details Example usage with an implicit iterator:
     /// @code
-    /// for (Edge edge : doc->traverseGraph())
+    /// for (Edge edge : inputElem->traverseGraph())
     /// {
-    ///     cout << edge.getUpstreamElement()->asString() << endl;
+    ///     ElementPtr upElem = edge.getUpstreamElement();
+    ///     ElementPtr downElem = edge.getDownstreamElement();
+    ///     cout << upElem->asString() << " lies upstream from " << downElem->asString() << endl;
     /// }
     /// @endcode
     /// Example usage with an explicit iterator:
     /// @code
-    /// for (mx::GraphIterator it = doc->traverseGraph().begin(); it != mx::GraphIterator::end(); ++it)
+    /// for (mx::GraphIterator it = inputElem->traverseGraph().begin(); it != mx::GraphIterator::end(); ++it)
     /// {
     ///     mx::ElementPtr elem = it.getUpstreamElement();
     ///     cout << elem->asString() << " at depth " << it.getElementDepth() << endl;
     /// }
     /// @endcode
-    /// @todo This method doesn't yet support material inheritance for
-    ///     its material argument.
     /// @sa getUpstreamEdge
     /// @sa getUpstreamElement
-    GraphIterator traverseGraph(ConstMaterialPtr material = ConstMaterialPtr()) const;
+    GraphIterator traverseGraph(ConstMaterialPtr material = nullptr) const;
 
     /// Return the Edge with the given index that lies directly upstream from
     /// this element in the dataflow graph.
@@ -509,7 +544,7 @@ class Element : public enable_shared_from_this<Element>
     /// @param index An optional index of the edge to be returned, where the
     ///    valid index range may be determined with getUpstreamEdgeCount.
     /// @return The upstream Edge, if valid, or an empty Edge object.
-    virtual Edge getUpstreamEdge(ConstMaterialPtr material = ConstMaterialPtr(),
+    virtual Edge getUpstreamEdge(ConstMaterialPtr material = nullptr,
                                  size_t index = 0) const;
 
     /// Return the number of queriable upstream edges for this element.
@@ -525,16 +560,35 @@ class Element : public enable_shared_from_this<Element>
     /// @param index An optional index of the element to be returned, where the
     ///    valid index range may be determined with getUpstreamEdgeCount.
     /// @return The upstream Element, if valid, or an empty ElementPtr.
-    ElementPtr getUpstreamElement(ConstMaterialPtr material = ConstMaterialPtr(),
+    ElementPtr getUpstreamElement(ConstMaterialPtr material = nullptr,
                                   size_t index = 0) const;
+
+    /// Traverse the inheritance chain from the given element to each element
+    /// from which it inherits.
+    /// @throws ExceptionFoundCycle if a cycle is encountered.
+    /// @return An InheritanceIterator object.
+    /// @details Example usage:
+    /// @code
+    /// ConstElementPtr derivedElem;
+    /// for (ConstElementPtr elem : inputElem->traverseInheritance())
+    /// {
+    ///     if (derivedElem)
+    ///         cout << derivedElem->asString() << " inherits from " << elem->asString() << endl;
+    ///     derivedElem = elem;
+    /// }
+    /// @endcode
+    InheritanceIterator traverseInheritance() const;
 
     /// Traverse the tree from the given element to each of its ancestors.
     /// @return An AncestorIterator object.
     /// @details Example usage:
     /// @code
-    /// for (ConstElementPtr elem : doc->traverseAncestors())
+    /// ConstElementPtr childElem;
+    /// for (ConstElementPtr elem : inputElem->traverseAncestors())
     /// {
-    ///     cout << elem->asString() << endl;
+    ///     if (childElem)
+    ///         cout << childElem->asString() << " is a child of " << elem->asString() << endl;
+    ///     childElem = elem;
     /// }
     /// @endcode
     AncestorIterator traverseAncestors() const;
@@ -579,16 +633,17 @@ class Element : public enable_shared_from_this<Element>
 
     /// Copy all attributes and descendants from the given element to this one.
     /// @param source The element from which content is copied.
-    /// @param sourceUris If true, then source URIs from the given element
-    ///    and its descendants are also copied.  Defaults to false.
-    void copyContentFrom(ConstElementPtr source, bool sourceUris = false);
+    /// @param copyOptions An optional pointer to a CopyOptions object.
+    ///    If provided, then the given options will affect the behavior of the
+    ///    copy function.  Defaults to a null pointer.
+    void copyContentFrom(ConstElementPtr source, const class CopyOptions* copyOptions = nullptr);
 
     /// Clear all attributes and descendants from this element.
     void clearContent();
 
     /// Using the input name as a starting point, modify it to create a valid,
     /// unique name for a child element.
-    string createValidChildName(string name)
+    string createValidChildName(string name) const
     {
         name = createValidName(name);
         while (_childMap.count(name))
@@ -737,7 +792,7 @@ class ValueElement : public TypedElement
     /// @param resolver An optional string resolver, which will be used to
     ///    apply string substitutions.  By default, a new string resolver
     ///    will be created at this scope and applied to the return value.
-    string getResolvedValueString(StringResolverPtr resolver = StringResolverPtr()) const;
+    string getResolvedValueString(StringResolverPtr resolver = nullptr) const;
 
     /// @}
     /// @name Public Names
@@ -812,12 +867,8 @@ class ValueElement : public TypedElement
     /// Set the typed value of an element.
     template<class T> void setValue(const T& value, const string& type = EMPTY_STRING)
     {
-        ValuePtr valuePtr = Value::createValue<T>(value);
-        if (!type.empty())
-            setType(type);
-        else
-            setType(valuePtr->getTypeString());
-        setValueString(valuePtr->getValueString());
+        setType(!type.empty() ? type : getTypeString<T>());
+        setValueString(toValueString(value));
     }
 
     /// Return true if the element possesses a typed value.
@@ -827,11 +878,14 @@ class ValueElement : public TypedElement
     }
 
     /// Return the typed value of an element as a generic value object, which
-    /// may be queried to access its data.  If this element does not possess
-    /// a typed value, then a then a value object containing an empty string
-    /// is returned.
+    /// may be queried to access its data.
+    ///
+    /// @return A shared pointer to the typed value of this element, or an
+    ///    empty shared pointer if no value is present.
     ValuePtr getValue() const
     {
+        if (!hasValue())
+            return ValuePtr();
         return Value::createValueFromStrings(getValueString(), getType());
     }
 
@@ -852,15 +906,15 @@ class ValueElement : public TypedElement
     ///
     /// @param material The material whose data bindings will be applied to
     ///    the evaluation.
-    /// @return A shared pointer to a generic value.
+    /// @return A shared pointer to a typed value, or an empty shared pointer if
+    ///    no bound or default value was found.
     ValuePtr getBoundValue(ConstMaterialPtr material) const;
 
     /// Return the default value for this element, which will be used as its bound
     /// value when no external binding from a material is present.
     ///
-    /// If this element has no default value then an empty shared pointer is
-    /// returned.
-    /// @return A shared pointer to a generic value.
+    /// @return A shared pointer to a typed value, or an empty shared pointer if
+    ///    no default value was found.
     ValuePtr getDefaultValue() const;
 
     /// @}
@@ -965,13 +1019,35 @@ class StringResolver
         _filenameMap[key] = value;
     }
 
+    /// Get list of filename substring substitutions.
+    const StringMap& getFilenameSubstitutions() const
+    {
+        return _filenameMap;
+    }
+
+    /// @}
+    /// @name Geometry Name Substitutions
+    /// @{
+
+    /// Set an arbitrary substring substitution for geometry name data values.
+    void setGeomNameSubstitution(const string& key, const string& value)
+    {
+        _geomNameMap[key] = value;
+    }
+
+    /// Get list of geometry name substring substitutions.
+    const StringMap& getGeomNameSubstitutions() const
+    {
+        return _geomNameMap;
+    }
+
     /// @}
     /// @name Resolution
     /// @{
 
     /// Given an input string and type, apply all appropriate modifiers and
     /// return the resulting string.
-    string resolve(const string& str, const string& type) const;
+    virtual string resolve(const string& str, const string& type) const;
 
     /// @}
 
@@ -979,27 +1055,37 @@ class StringResolver
     string _filePrefix;
     string _geomPrefix;
     StringMap _filenameMap;
+    StringMap _geomNameMap;
 };
 
-/// @class @ExceptionOrphanedElement
+/// @class CopyOptions
+/// A set of options for controlling the behavior of element copy operations.
+class CopyOptions
+{
+  public:
+    CopyOptions() :
+        skipDuplicateElements(false),
+        copySourceUris(false)
+    {
+    }
+    ~CopyOptions() { }
+
+    /// If true, elements at the same scope with duplicate names will be skipped;
+    /// otherwise, they will trigger an exception.  Defaults to false.
+    bool skipDuplicateElements;
+
+    /// If true, then source URIs from the given element
+    /// and its descendants are also copied.  Defaults to false.
+    bool copySourceUris;
+};
+
+/// @class ExceptionOrphanedElement
 /// An exception that is thrown when an ElementPtr is used after its owning
 /// Document has gone out of scope.
 class ExceptionOrphanedElement : public Exception
 {
   public:
-    ExceptionOrphanedElement(const string& msg) :
-        Exception(msg)
-    {
-    }
-
-    ExceptionOrphanedElement(const ExceptionOrphanedElement& e) :
-        Exception(e)
-    {
-    }
-
-    virtual ~ExceptionOrphanedElement() throw()
-    {
-    }
+    using Exception::Exception;
 };
 
 template<class T> shared_ptr<T> Element::addChild(const string& name)

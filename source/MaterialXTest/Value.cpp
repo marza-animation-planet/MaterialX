@@ -12,7 +12,7 @@ namespace mx = MaterialX;
 
 template<class T> void testTypedValue(const T& v1, const T& v2)
 {
-    T v0(mx::TypedValue<T>::ZERO);
+    T v0{};
 
     // Constructor and assignment
     mx::ValuePtr value0 = mx::Value::createValue(v0);
@@ -40,8 +40,34 @@ template<class T> void testTypedValue(const T& v1, const T& v2)
     REQUIRE(newValue2->asA<T>() == v2);
 }
 
+TEST_CASE("Value strings", "[value]")
+{
+    // Convert from data values to value strings.
+    REQUIRE(mx::toValueString(1) == "1");
+    REQUIRE(mx::toValueString(1.0f) == "1");
+    REQUIRE(mx::toValueString(true) == "true");
+    REQUIRE(mx::toValueString(false) == "false");
+    REQUIRE(mx::toValueString(mx::Color3(1.0f)) == "1, 1, 1");
+    REQUIRE(mx::toValueString(std::string("text")) == "text");
+
+    // Convert from value strings to data values.
+    REQUIRE(mx::fromValueString<int>("1") == 1);
+    REQUIRE(mx::fromValueString<float>("1") == 1.0f);
+    REQUIRE(mx::fromValueString<bool>("true") == true);
+    REQUIRE(mx::fromValueString<bool>("false") == false);
+    REQUIRE(mx::fromValueString<mx::Color3>("1, 1, 1") == mx::Color3(1.0f));
+    REQUIRE(mx::fromValueString<std::string>("text") == "text");
+
+    // Verify that invalid conversions throw exceptions.
+    REQUIRE_THROWS_AS(mx::fromValueString<int>("text"), mx::ExceptionTypeError);
+    REQUIRE_THROWS_AS(mx::fromValueString<float>("text"), mx::ExceptionTypeError);
+    REQUIRE_THROWS_AS(mx::fromValueString<bool>("1"), mx::ExceptionTypeError);
+    REQUIRE_THROWS_AS(mx::fromValueString<mx::Color3>("1"), mx::ExceptionTypeError);
+}
+
 TEST_CASE("Typed values", "[value]")
 {
+    // Base types
     testTypedValue<int>(1, 2);
     testTypedValue<bool>(false, true);
     testTypedValue<float>(1.0f, 2.0f);
@@ -57,12 +83,24 @@ TEST_CASE("Typed values", "[value]")
                    mx::Vector3(1.5f, 2.5f, 3.5f));
     testTypedValue(mx::Vector4(1.0f, 2.0f, 3.0f, 4.0f),
                    mx::Vector4(1.5f, 2.5f, 3.5f, 4.5f));
-    testTypedValue(mx::Matrix3x3(0.0f),
-                   mx::Matrix3x3(1.0f));
-    testTypedValue(mx::Matrix4x4(0.0f),
-                   mx::Matrix4x4(1.0f));
+    testTypedValue(mx::Matrix33(0.0f),
+                   mx::Matrix33(1.0f));
+    testTypedValue(mx::Matrix44(0.0f),
+                   mx::Matrix44(1.0f));
     testTypedValue(std::string("first_value"),
                    std::string("second_value"));
+
+    // Array types
+    testTypedValue(std::vector<int>{1, 2, 3},
+                   std::vector<int>{4, 5, 6});
+    testTypedValue(std::vector<bool>{false, false, false},
+                   std::vector<bool>{true, true, true});
+    testTypedValue(std::vector<float>{1.0f, 2.0f, 3.0f},
+                   std::vector<float>{4.0f, 5.0f, 6.0f});
     testTypedValue(std::vector<std::string>{"one", "two", "three"},
                    std::vector<std::string>{"four", "five", "six"});
+
+    // Alias types
+    testTypedValue<long>(1l, 2l);
+    testTypedValue<double>(1.0, 2.0);
 }

@@ -18,63 +18,39 @@ namespace MaterialX
 
 /// @class XmlReadOptions
 /// A set of options for controlling the behavior of XML read functions.
-class XmlReadOptions
+class XmlReadOptions 
 {
   public:
     XmlReadOptions() :
-        readXIncludes(true),
-        skipDuplicateElements(false)
+        skipDuplicateElements(false),
+        readXIncludes(true)
     {
     }
     ~XmlReadOptions() { }
     
-    /// If true, XInclude references will be read from disk and included in the
-    /// document.  Defaults to true.
-    bool readXIncludes;
-
     /// If true, elements at the same scope with duplicate names will be skipped;
     /// otherwise, they will trigger an exception.  Defaults to false.
     bool skipDuplicateElements;
+
+    /// If true, XInclude references will be read from disk and included in the
+    /// document.  Defaults to true.
+    bool readXIncludes;
 };
 
-/// @class @ExceptionParseError
+/// @class ExceptionParseError
 /// An exception that is thrown when a requested document cannot be parsed.
 class ExceptionParseError : public Exception
 {
   public:
-    ExceptionParseError(const string& msg) :
-        Exception(msg)
-    {
-    }
-
-    ExceptionParseError(const ExceptionParseError& e) :
-        Exception(e)
-    {
-    }
-
-    virtual ~ExceptionParseError() throw()
-    {
-    }
+    using Exception::Exception;
 };
 
-/// @class @ExceptionFileMissing
+/// @class ExceptionFileMissing
 /// An exception that is thrown when a requested file cannot be opened.
 class ExceptionFileMissing : public Exception
 {
   public:
-    ExceptionFileMissing(const string& msg) :
-        Exception(msg)
-    {
-    }
-
-    ExceptionFileMissing(const ExceptionFileMissing& e) :
-        Exception(e)
-    {
-    }
-
-    virtual ~ExceptionFileMissing() throw()
-    {
-    }
+    using Exception::Exception;
 };
 
 /// @name Read Functions

@@ -9,8 +9,6 @@
 
 #include <MaterialXCore/Node.h>
 
-#include <PyBind11/stl.h>
-
 namespace py = pybind11;
 namespace mx = MaterialX;
 
@@ -59,6 +57,8 @@ void bindPyInterface(py::module& mod)
         .def("getOutputCount", &mx::InterfaceElement::getOutputCount)
         .def("_getParameterValue", &mx::InterfaceElement::getParameterValue)
         .def("_getInputValue", &mx::InterfaceElement::getInputValue)
+        .def("getDeclaration", &mx::InterfaceElement::getDeclaration,
+            py::arg("target") = mx::EMPTY_STRING)
         .def("isTypeCompatible", &mx::InterfaceElement::isTypeCompatible)
         BIND_INTERFACE_TYPE_INSTANCE(integer, int)
         BIND_INTERFACE_TYPE_INSTANCE(boolean, bool)
@@ -69,7 +69,7 @@ void bindPyInterface(py::module& mod)
         BIND_INTERFACE_TYPE_INSTANCE(vector2, mx::Vector2)
         BIND_INTERFACE_TYPE_INSTANCE(vector3, mx::Vector3)
         BIND_INTERFACE_TYPE_INSTANCE(vector4, mx::Vector4)
-        BIND_INTERFACE_TYPE_INSTANCE(matrix33, mx::Matrix3x3)
-        BIND_INTERFACE_TYPE_INSTANCE(matrix44, mx::Matrix4x4)
+        BIND_INTERFACE_TYPE_INSTANCE(matrix33, mx::Matrix33)
+        BIND_INTERFACE_TYPE_INSTANCE(matrix44, mx::Matrix44)
         BIND_INTERFACE_TYPE_INSTANCE(string, std::string);
 }

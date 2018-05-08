@@ -6,21 +6,28 @@
 #include <MaterialXCore/Util.h>
 
 #include <MaterialXCore/Element.h>
-#include <MaterialXCore/Node.h>
-
-#include <sstream>
 
 namespace MaterialX
 {
 
-const int MAJOR_VERSION = MATERIALX_MAJOR_VERSION;
-const int MINOR_VERSION = MATERIALX_MINOR_VERSION;
-const int BUILD_VERSION = MATERIALX_BUILD_VERSION;
-
-const string LIBRARY_VERSION_STRING = std::to_string(MAJOR_VERSION) + "." +
-                                      std::to_string(MINOR_VERSION) + "." +
-                                      std::to_string(BUILD_VERSION);
 const string EMPTY_STRING;
+
+namespace {
+
+const string LIBRARY_VERSION_STRING = std::to_string(MATERIALX_MAJOR_VERSION) + "." +
+                                      std::to_string(MATERIALX_MINOR_VERSION) + "." +
+                                      std::to_string(MATERIALX_BUILD_VERSION);
+
+const std::tuple<int, int, int> LIBRARY_VERSION_TUPLE(MATERIALX_MAJOR_VERSION,
+                                                      MATERIALX_MINOR_VERSION,
+                                                      MATERIALX_BUILD_VERSION);
+
+bool invalidNameChar(char c)
+{
+     return !isalnum(c) && c != '_';
+}
+
+} // anonymous namespace
 
 //
 // Utility methods
@@ -33,21 +40,19 @@ string getVersionString()
 
 std::tuple<int, int, int> getVersionIntegers()
 {
-    return std::make_tuple(MATERIALX_MAJOR_VERSION,
-                           MATERIALX_MINOR_VERSION,
-                           MATERIALX_BUILD_VERSION);
+    return LIBRARY_VERSION_TUPLE;
 }
 
 string createValidName(string name, char replaceChar)
 {
-    auto replacePred = [](char c) { return !isalnum(c) && c != '_'; };
-    std::replace_if(name.begin(), name.end(), replacePred, replaceChar);
+    std::replace_if(name.begin(), name.end(), invalidNameChar, replaceChar);
     return name;
 }
 
 bool isValidName(const string& name)
 {
-    return name == createValidName(name);
+    auto it = std::find_if(name.begin(), name.end(), invalidNameChar);
+    return it == name.end();
 }
 
 string incrementName(const string& name)
@@ -94,7 +99,7 @@ string replaceSubstrings(string str, const StringMap& stringMap)
             continue;
 
         size_t pos = 0;
-        while ((pos = str.find(pair.first, pos)) != std::string::npos)
+        while ((pos = str.find(pair.first, pos)) != string::npos)
         {
              str.replace(pos, pair.first.length(), pair.second);
              pos += pair.second.length();
@@ -112,49 +117,6 @@ string prettyPrint(ElementPtr elem)
         text += indent + it.getElement()->asString() + "\n";
     }
     return text;
-}
-
-string printGraphDot(NodeGraphPtr graph)
-{
-    std::stringstream dot;
-
-    dot << "digraph {\n";
-
-    // Print the nodes
-    for (NodePtr node : graph->getChildrenOfType<Node>())
-    {
-        dot << "    \"" << node->getName() << "\" ";
-        const string& category = node->getCategory();
-        if (category == "compare" || category == "switch")
-        {
-            dot << "[shape=diamond];\n";
-        }
-        else
-        {
-            dot << "[shape=box];\n";
-        }
-    }
- 
-    // Print the connections
-    std::set<Edge> processedEdges;
-    for (OutputPtr output : graph->getChildrenOfType<Output>())
-    {
-        for (Edge edge : output->traverseGraph())
-        {
-            if (processedEdges.count(edge) == 0)
-            {
-                processedEdges.insert(edge);
-                ElementPtr upstreamElem = edge.getUpstreamElement();
-                ElementPtr downstreamElem = edge.getDownstreamElement();
-                ElementPtr connectingElem = edge.getConnectingElement();
-                dot << "    \"" << upstreamElem->getName() << "\" -> \"" << downstreamElem->getName() << "\" [label=\"" << (connectingElem ? connectingElem->getName() : EMPTY_STRING) << "\"];\n";
-            }
-        }
-    }
-
-    dot << "}\n";
-
-    return dot.str();
 }
 
 } // namespace MaterialX

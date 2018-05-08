@@ -5,6 +5,8 @@
 
 #include <MaterialXCore/Value.h>
 
+#include <MaterialXCore/Util.h>
+
 #include <sstream>
 #include <type_traits>
 
@@ -13,66 +15,193 @@ namespace MaterialX
 
 Value::CreatorMap Value::_creatorMap;
 
+namespace {
+
+template <class T> using enable_if_mx_vector_t =
+    typename std::enable_if<std::is_base_of<VectorBase, T>::value, T>::type;
+template <class T> using enable_if_mx_matrix_t =
+    typename std::enable_if<std::is_base_of<MatrixBase, T>::value, T>::type;
+
+template <class T> class is_std_vector : public std::false_type { };
+template <class T> class is_std_vector< vector<T> > : public std::true_type { };
+template <class T> using enable_if_std_vector_t =
+    typename std::enable_if<is_std_vector<T>::value, T>::type;
+
+template <class T> void stringToData(const string& value, T& data)
+{
+    std::stringstream ss(value);
+    if (!(ss >> data))
+    {
+        throw ExceptionTypeError("Type mismatch in generic stringToData: " + value);
+    }
+}
+
+template <> void stringToData(const string& str, bool& data)
+{
+    if (str == VALUE_STRING_TRUE)
+        data = true;
+    else if (str == VALUE_STRING_FALSE)
+        data = false;
+    else
+        throw ExceptionTypeError("Type mismatch in boolean stringToData: " + str);
+}
+
+template <> void stringToData(const string& str, string& data)
+{
+    data = str;
+}
+
+template <class T> void stringToData(const string& str, enable_if_mx_vector_t<T>& data)
+{
+    vector<string> tokens = splitString(str, ARRAY_VALID_SEPARATORS);
+    if (tokens.size() != data.numElements())
+    {
+        throw ExceptionTypeError("Type mismatch in vector stringToData: " + str);
+    }
+    for (size_t i = 0; i < data.numElements(); i++)
+    {
+        stringToData(tokens[i], data[i]);
+    }
+}
+
+template <class T> void stringToData(const string& str, enable_if_mx_matrix_t<T>& data)
+{
+    vector<string> tokens = splitString(str, ARRAY_VALID_SEPARATORS);
+    if (tokens.size() != data.numRows() * data.numColumns())
+    {
+        throw ExceptionTypeError("Type mismatch in matrix stringToData: " + str);
+    }
+    for (size_t i = 0; i < data.numRows(); i++)
+    {
+        for (size_t j = 0; j < data.numColumns(); j++)
+        {
+            stringToData(tokens[i * data.numRows() + j], data[i][j]);
+        }
+    }
+}
+
+template <class T> void stringToData(const string& str, enable_if_std_vector_t<T>& data)
+{
+    for (const string& token : splitString(str, ARRAY_VALID_SEPARATORS))
+    {
+        typename T::value_type val;
+        stringToData(token, val);
+        data.push_back(val);
+    }
+}
+
+template <class T> void dataToString(const T& data, string& str)
+{
+    std::stringstream ss;
+    ss << data;
+    str = ss.str();
+}
+
+template <> void dataToString(const bool& data, string& str)
+{
+    str = data ? VALUE_STRING_TRUE : VALUE_STRING_FALSE;
+}
+
+template <> void dataToString(const string& data, string& str)
+{
+    str = data;
+}
+
+template <class T> void dataToString(const enable_if_mx_vector_t<T>& data, string& str)
+{
+    for (size_t i = 0; i < data.numElements(); i++)
+    {
+        string token;
+        dataToString(data[i], token);
+        str += token;
+        if (i + 1 < data.numElements())
+        {
+            str += ARRAY_PREFERRED_SEPARATOR;
+        }
+    }
+}
+
+template <class T> void dataToString(const enable_if_mx_matrix_t<T>& data, string& str)
+{
+    for (size_t i = 0; i < data.numRows(); i++)
+    {
+        for (size_t j = 0; j < data.numColumns(); j++)
+        {
+            string token;
+            dataToString(data[i][j], token);
+            str += token;
+            if (i + 1 < data.numRows() ||
+                j + 1 < data.numColumns())
+            {
+                str += ARRAY_PREFERRED_SEPARATOR;
+            }
+        }
+    }
+}
+
+template <class T> void dataToString(const enable_if_std_vector_t<T>& data, string& str)
+{
+    for (size_t i = 0; i < data.size(); i++)
+    {
+        string token;
+        dataToString<typename T::value_type>(data[i], token);
+        str += token;
+        if (i + 1 < data.size())
+        {
+            str += ARRAY_PREFERRED_SEPARATOR;
+        }
+    }
+}
+
+} // anonymous namespace
+
+//
+// Global functions
+//
+
+template<class T> const string& getTypeString()
+{
+    return TypedValue<T>::TYPE;
+}
+
+template <class T> string toValueString(const T& data)
+{
+    string value;
+    dataToString<T>(data, value);
+    return value;
+}
+
+template <class T> T fromValueString(const string& value)
+{
+    T data;
+    stringToData<T>(value, data);
+    return data;
+}
+
 //
 // TypedValue methods
 //
-
-template <> string TypedValue<std::string>::getValueString() const
-{
-    return _data;
-}
-
-template <> string TypedValue<bool>::getValueString() const
-{
-    return _data ? VALUE_STRING_TRUE : VALUE_STRING_FALSE;
-}
-
-template <class T> string TypedValue<T>::getValueString() const
-{
-    std::stringstream ss;
-    if (!(ss << _data))
-        throw Exception("Unsupported value in getValueString");
-    return ss.str();
-}
 
 template <class T> const string& TypedValue<T>::getTypeString() const
 {
     return TYPE;
 }
 
-template <> ValuePtr TypedValue<std::string>::createFromString(const string& value)
+template <class T> string TypedValue<T>::getValueString() const
 {
-    return Value::createValue<std::string>(value);
-}
-
-template <> ValuePtr TypedValue<bool>::createFromString(const string& value)
-{
-    if (value == VALUE_STRING_TRUE)
-        return Value::createValue<bool>(true);
-    else if (value == VALUE_STRING_FALSE)
-        return Value::createValue<bool>(false);
-    return nullptr;
+    return toValueString<T>(_data);
 }
 
 template <class T> ValuePtr TypedValue<T>::createFromString(const string& value)
 {
-    std::stringstream ss;
-    if (std::is_base_of<VectorBase, T>::value)
+    try
     {
-        string fmt = value;
-        fmt.erase(std::remove(fmt.begin(), fmt.end(), ' '), fmt.end());
-        std::replace(fmt.begin(), fmt.end(), ',', ' ');
-        ss << fmt;
+        return Value::createValue<T>(fromValueString<T>(value));
     }
-    else
+    catch (ExceptionTypeError&)
     {
-        ss << value;
     }
-
-    T data;
-    if ((ss >> data))
-        return Value::createValue<T>(data);
-    return nullptr;
+    return ValuePtr();
 }
 
 //
@@ -85,31 +214,22 @@ ValuePtr Value::createValueFromStrings(const string& value, const string& type)
     if (it != _creatorMap.end())
         return it->second(value);
 
-    return TypedValue<std::string>::createFromString(value);
+    return TypedValue<string>::createFromString(value);
 }
 
 template<class T> bool Value::isA() const
 {
-    return dynamic_cast<TypedValue<T> const*>(this) != nullptr;    
+    return dynamic_cast<const TypedValue<T>*>(this) != nullptr;
 }
 
 template<class T> T Value::asA() const
 {
-    TypedValue<T> const* typedVal = dynamic_cast<TypedValue<T> const*>(this);
+    const TypedValue<T>* typedVal = dynamic_cast<const TypedValue<T>*>(this);
     if (!typedVal)
     {
-        throw Exception("Incorrect type specified for value");
+        throw ExceptionTypeError("Incorrect type specified for value");
     }
     return typedVal->getData();
-}
-
-//
-// Global functions
-//
-
-template<class T> const string& getTypeString()
-{
-    return TypedValue<T>::TYPE;
 }
 
 //
@@ -121,7 +241,10 @@ template <class T> class ValueRegistry
   public:
     ValueRegistry()
     {
-        Value::_creatorMap[TypedValue<T>::TYPE] = TypedValue<T>::createFromString;
+        if (!Value::_creatorMap.count(TypedValue<T>::TYPE))
+        {
+            Value::_creatorMap[TypedValue<T>::TYPE] = TypedValue<T>::createFromString;
+        }
     }
     ~ValueRegistry() { }
 };
@@ -130,26 +253,41 @@ template <class T> class ValueRegistry
 // Template instantiations
 //
 
-#define INSTANTIATE_TYPE(T, type)                                   \
-template <> const string TypedValue<T>::TYPE = #type;               \
-template <> const T TypedValue<T>::ZERO = T();                      \
-template bool Value::isA<T>() const;                                \
-template T Value::asA<T>() const;                                   \
-template const string& getTypeString<T>();                          \
-ValueRegistry<T> registry##type;
+using IntVec = vector<int>;
+using BoolVec = vector<bool>;
+using FloatVec = vector<float>;
 
-INSTANTIATE_TYPE(int, integer)
-INSTANTIATE_TYPE(bool, boolean)
-INSTANTIATE_TYPE(float, float)
-INSTANTIATE_TYPE(Color2, color2)
-INSTANTIATE_TYPE(Color3, color3)
-INSTANTIATE_TYPE(Color4, color4)
-INSTANTIATE_TYPE(Vector2, vector2)
-INSTANTIATE_TYPE(Vector3, vector3)
-INSTANTIATE_TYPE(Vector4, vector4)
-INSTANTIATE_TYPE(Matrix3x3, matrix33)
-INSTANTIATE_TYPE(Matrix4x4, matrix44)
-INSTANTIATE_TYPE(string, string)
-INSTANTIATE_TYPE(StringVec, stringarray)
+#define INSTANTIATE_TYPE(T, name)                       \
+template <> const string TypedValue<T>::TYPE = name;    \
+template bool Value::isA<T>() const;                    \
+template T Value::asA<T>() const;                       \
+template const string& getTypeString<T>();              \
+template string toValueString(const T& data);           \
+template T fromValueString(const string& value);        \
+ValueRegistry<T> registry##T;
+
+// Base types
+INSTANTIATE_TYPE(int, "integer")
+INSTANTIATE_TYPE(bool, "boolean")
+INSTANTIATE_TYPE(float, "float")
+INSTANTIATE_TYPE(Color2, "color2")
+INSTANTIATE_TYPE(Color3, "color3")
+INSTANTIATE_TYPE(Color4, "color4")
+INSTANTIATE_TYPE(Vector2, "vector2")
+INSTANTIATE_TYPE(Vector3, "vector3")
+INSTANTIATE_TYPE(Vector4, "vector4")
+INSTANTIATE_TYPE(Matrix33, "matrix33")
+INSTANTIATE_TYPE(Matrix44, "matrix44")
+INSTANTIATE_TYPE(string, "string")
+
+// Array types
+INSTANTIATE_TYPE(IntVec, "integerarray")
+INSTANTIATE_TYPE(BoolVec, "booleanarray")
+INSTANTIATE_TYPE(FloatVec, "floatarray")
+INSTANTIATE_TYPE(StringVec, "stringarray")
+
+// Alias types
+INSTANTIATE_TYPE(long, "integer")
+INSTANTIATE_TYPE(double, "float")
 
 } // namespace MaterialX
