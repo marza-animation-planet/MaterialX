@@ -7,6 +7,7 @@
 
 #include <MaterialXCore/Util.h>
 
+#include <iomanip>
 #include <sstream>
 #include <type_traits>
 
@@ -14,6 +15,8 @@ namespace MaterialX
 {
 
 Value::CreatorMap Value::_creatorMap;
+Value::FloatFormat Value::_floatFormat = Value::FloatFormatDefault;
+int Value::_floatPrecision = 6;
 
 namespace {
 
@@ -53,7 +56,7 @@ template <> void stringToData(const string& str, string& data)
 
 template <class T> void stringToData(const string& str, enable_if_mx_vector_t<T>& data)
 {
-    vector<string> tokens = splitString(str, ARRAY_VALID_SEPARATORS);
+    StringVec tokens = splitString(str, ARRAY_VALID_SEPARATORS);
     if (tokens.size() != data.numElements())
     {
         throw ExceptionTypeError("Type mismatch in vector stringToData: " + str);
@@ -66,7 +69,7 @@ template <class T> void stringToData(const string& str, enable_if_mx_vector_t<T>
 
 template <class T> void stringToData(const string& str, enable_if_mx_matrix_t<T>& data)
 {
-    vector<string> tokens = splitString(str, ARRAY_VALID_SEPARATORS);
+    StringVec tokens = splitString(str, ARRAY_VALID_SEPARATORS);
     if (tokens.size() != data.numRows() * data.numColumns())
     {
         throw ExceptionTypeError("Type mismatch in matrix stringToData: " + str);
@@ -93,6 +96,15 @@ template <class T> void stringToData(const string& str, enable_if_std_vector_t<T
 template <class T> void dataToString(const T& data, string& str)
 {
     std::stringstream ss;
+
+    // Set float format and precision for the stream
+    const Value::FloatFormat fmt = Value::getFloatFormat();
+    ss.setf(std::ios_base::fmtflags(
+            (fmt == Value::FloatFormatFixed ? std::ios_base::fixed :
+            (fmt == Value::FloatFormatScientific ? std::ios_base::scientific : 0))),
+        std::ios_base::floatfield);
+    ss.precision(Value::getFloatPrecision());
+
     ss << data;
     str = ss.str();
 }
@@ -230,6 +242,20 @@ template<class T> T Value::asA() const
         throw ExceptionTypeError("Incorrect type specified for value");
     }
     return typedVal->getData();
+}
+
+Value::ScopedFloatFormatting::ScopedFloatFormatting(FloatFormat format, int precision) :
+    _format(Value::getFloatFormat()),
+    _precision(Value::getFloatPrecision())
+{
+    Value::setFloatFormat(format);
+    Value::setFloatPrecision(precision);
+}
+
+Value::ScopedFloatFormatting::~ScopedFloatFormatting()
+{
+    Value::setFloatFormat(_format);
+    Value::setFloatPrecision(_precision);
 }
 
 //

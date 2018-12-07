@@ -50,6 +50,22 @@ TEST_CASE("Value strings", "[value]")
     REQUIRE(mx::toValueString(mx::Color3(1.0f)) == "1, 1, 1");
     REQUIRE(mx::toValueString(std::string("text")) == "text");
 
+    // Convert from data values to value strings
+    // using the various float formattings.
+    {
+        mx::Value::ScopedFloatFormatting fmt(mx::Value::FloatFormatFixed, 3);
+        REQUIRE(mx::toValueString(0.1234f) == "0.123");
+        REQUIRE(mx::toValueString(mx::Color3(1.0f)) == "1.000, 1.000, 1.000");
+    }
+    {
+        mx::Value::ScopedFloatFormatting fmt(mx::Value::FloatFormatScientific, 2);
+        REQUIRE(mx::toValueString(0.1234f) == "1.23e-01");
+    }
+    {
+        mx::Value::ScopedFloatFormatting fmt(mx::Value::FloatFormatDefault, 2);
+        REQUIRE(mx::toValueString(0.1234f) == "0.12");
+    }
+
     // Convert from value strings to data values.
     REQUIRE(mx::fromValueString<int>("1") == 1);
     REQUIRE(mx::fromValueString<float>("1") == 1.0f);
@@ -59,10 +75,10 @@ TEST_CASE("Value strings", "[value]")
     REQUIRE(mx::fromValueString<std::string>("text") == "text");
 
     // Verify that invalid conversions throw exceptions.
-    REQUIRE_THROWS_AS(mx::fromValueString<int>("text"), mx::ExceptionTypeError);
-    REQUIRE_THROWS_AS(mx::fromValueString<float>("text"), mx::ExceptionTypeError);
-    REQUIRE_THROWS_AS(mx::fromValueString<bool>("1"), mx::ExceptionTypeError);
-    REQUIRE_THROWS_AS(mx::fromValueString<mx::Color3>("1"), mx::ExceptionTypeError);
+    REQUIRE_THROWS_AS(mx::fromValueString<int>("text"), mx::ExceptionTypeError&);
+    REQUIRE_THROWS_AS(mx::fromValueString<float>("text"), mx::ExceptionTypeError&);
+    REQUIRE_THROWS_AS(mx::fromValueString<bool>("1"), mx::ExceptionTypeError&);
+    REQUIRE_THROWS_AS(mx::fromValueString<mx::Color3>("1"), mx::ExceptionTypeError&);
 }
 
 TEST_CASE("Typed values", "[value]")

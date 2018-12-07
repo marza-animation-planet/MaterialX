@@ -16,25 +16,30 @@
 namespace MaterialX
 {
 
+class Property;
+class PropertyAssign;
+class PropertySet;
+class PropertySetAssign;
+
 /// A shared pointer to a Property
-using PropertyPtr = shared_ptr<class Property>;
+using PropertyPtr = shared_ptr<Property>;
 /// A shared pointer to a const Property
-using ConstPropertyPtr = shared_ptr<const class Property>;
+using ConstPropertyPtr = shared_ptr<const Property>;
 
 /// A shared pointer to a PropertyAssign
-using PropertyAssignPtr = shared_ptr<class PropertyAssign>;
+using PropertyAssignPtr = shared_ptr<PropertyAssign>;
 /// A shared pointer to a const PropertyAssign
-using ConstPropertyAssignPtr = shared_ptr<const class PropertyAssign>;
+using ConstPropertyAssignPtr = shared_ptr<const PropertyAssign>;
 
 /// A shared pointer to a PropertySet
-using PropertySetPtr = shared_ptr<class PropertySet>;
+using PropertySetPtr = shared_ptr<PropertySet>;
 /// A shared pointer to a const PropertySet
-using ConstPropertySetPtr = shared_ptr<const class PropertySet>;
+using ConstPropertySetPtr = shared_ptr<const PropertySet>;
 
 /// A shared pointer to a PropertySetAssign
-using PropertySetAssignPtr = shared_ptr<class PropertySetAssign>;
+using PropertySetAssignPtr = shared_ptr<PropertySetAssign>;
 /// A shared pointer to a const PropertySetAssign
-using ConstPropertySetAssignPtr = shared_ptr<const class PropertySetAssign>;
+using ConstPropertySetAssignPtr = shared_ptr<const PropertySetAssign>;
 
 /// @class Property
 /// A property element within a PropertySet.
@@ -72,7 +77,7 @@ class PropertyAssign : public ValueElement
     }
 
     /// Return true if this element has a geometry string.
-    bool hasGeom()
+    bool hasGeom() const
     {
         return hasAttribute(GEOM_ATTRIBUTE);
     }
@@ -94,7 +99,7 @@ class PropertyAssign : public ValueElement
     }
 
     /// Return true if this element has a collection string.
-    bool hasCollectionString()
+    bool hasCollectionString() const
     {
         return hasAttribute(COLLECTION_ATTRIBUTE);
     }
