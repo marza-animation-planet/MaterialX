@@ -6,6 +6,7 @@
 #include <MaterialXCore/Interface.h>
 
 #include <MaterialXCore/Definition.h>
+#include <MaterialXCore/Document.h>
 #include <MaterialXCore/Material.h>
 #include <MaterialXCore/Node.h>
 
@@ -15,6 +16,7 @@ namespace MaterialX
 const string PortElement::NODE_NAME_ATTRIBUTE = "nodename";
 const string PortElement::OUTPUT_ATTRIBUTE = "output";
 const string InterfaceElement::NODE_DEF_ATTRIBUTE = "nodedef";
+const string Input::DEFAULT_GEOM_PROP_ATTRIBUTE = "defaultgeomprop";
 
 //
 // PortElement methods
@@ -84,9 +86,9 @@ Edge Parameter::getUpstreamEdge(ConstMaterialPtr material, size_t index) const
 {
     if (material && index < getUpstreamEdgeCount())
     {
-        ConstNodeDefPtr nodeDef = getParent()->isA<Implementation>() ?
-                                  getParent()->asA<Implementation>()->getNodeDef() :
-                                  getParent()->asA<NodeDef>();
+        ConstElementPtr parent = getParent();
+        ConstInterfaceElementPtr interface = parent ? parent->asA<InterfaceElement>() : nullptr;
+        ConstNodeDefPtr nodeDef = interface ? interface->getDeclaration() : nullptr;
         if (nodeDef)
         {
             // Apply BindParam elements to the Parameter.
@@ -117,33 +119,30 @@ Edge Input::getUpstreamEdge(ConstMaterialPtr material, size_t index) const
 {
     if (material && index < getUpstreamEdgeCount())
     {
-        ConstNodeDefPtr nodeDef = getParent()->isA<Implementation>() ?
-                                  getParent()->asA<Implementation>()->getNodeDef() :
-                                  getParent()->asA<NodeDef>();
+        ConstElementPtr parent = getParent();
+        ConstInterfaceElementPtr interface = parent ? parent->asA<InterfaceElement>() : nullptr;
+        ConstNodeDefPtr nodeDef = interface ? interface->getDeclaration() : nullptr;
         if (nodeDef)
         {
-            if (material)
+            // Apply BindInput elements to the Input.
+            for (ShaderRefPtr shaderRef : material->getActiveShaderRefs())
             {
-                // Apply BindInput elements to the Input.
-                for (ShaderRefPtr shaderRef : material->getActiveShaderRefs())
+                if (shaderRef->getNodeDef()->hasInheritedBase(nodeDef))
                 {
-                    if (shaderRef->getNodeDef()->hasInheritedBase(nodeDef))
+                    for (BindInputPtr bindInput : shaderRef->getBindInputs())
                     {
-                        for (BindInputPtr bindInput : shaderRef->getBindInputs())
+                        if (bindInput->getName() != getName())
                         {
-                            if (bindInput->getName() != getName())
-                            {
-                                continue;
-                            }
-                            OutputPtr output = bindInput->getConnectedOutput();
-                            if (output)
-                            {
-                                return Edge(getSelfNonConst(), bindInput, output);
-                            }
-                            if (bindInput->hasValue())
-                            {
-                                return Edge(getSelfNonConst(), nullptr, bindInput);
-                            }
+                            continue;
+                        }
+                        OutputPtr output = bindInput->getConnectedOutput();
+                        if (output)
+                        {
+                            return Edge(getSelfNonConst(), bindInput, output);
+                        }
+                        if (bindInput->hasValue())
+                        {
+                            return Edge(getSelfNonConst(), nullptr, bindInput);
                         }
                     }
                 }
@@ -152,6 +151,27 @@ Edge Input::getUpstreamEdge(ConstMaterialPtr material, size_t index) const
     }
 
     return NULL_EDGE;
+}
+
+GeomPropDefPtr Input::getDefaultGeomProp() const
+{
+    const string& defaultGeomProp = getAttribute(DEFAULT_GEOM_PROP_ATTRIBUTE);
+    if (!defaultGeomProp.empty())
+    {
+        ConstDocumentPtr doc = getDocument();
+        return doc->getChildOfType<GeomPropDef>(defaultGeomProp);
+    }
+    return nullptr;
+}
+
+bool Input::validate(string* message) const
+{
+    bool res = true;
+    if (hasDefaultGeomPropString())
+    {
+        validateRequire(getDefaultGeomProp() != nullptr, res, message, "Invalid defaultgeomprop string");
+    }
+    return PortElement::validate(message) && res;
 }
 
 //
@@ -191,23 +211,6 @@ bool Output::validate(string* message) const
 //
 // InterfaceElement methods
 //
-
-void InterfaceElement::setNodeDef(ConstNodeDefPtr nodeDef)
-{
-    if (nodeDef)
-    {
-        setNodeDefString(nodeDef->getName());
-    }
-    else
-    {
-        removeAttribute(NODE_DEF_ATTRIBUTE);
-    }
-}
-
-NodeDefPtr InterfaceElement::getNodeDef() const
-{
-    return resolveRootNameReference<NodeDef>(getNodeDefString());
-}
 
 ParameterPtr InterfaceElement::getActiveParameter(const string& name) const
 {
@@ -307,9 +310,9 @@ vector<TokenPtr> InterfaceElement::getActiveTokens() const
 
 ValueElementPtr InterfaceElement::getActiveValueElement(const string& name) const
 {
-    for (ConstElementPtr elem : traverseInheritance())
+    for (ConstElementPtr interface : traverseInheritance())
     {
-       ValueElementPtr valueElem = elem->asA<InterfaceElement>()->getChildOfType<ValueElement>(name);
+        ValueElementPtr valueElem = interface->getChildOfType<ValueElement>(name);
         if (valueElem)
         {
             return valueElem;
@@ -321,9 +324,9 @@ ValueElementPtr InterfaceElement::getActiveValueElement(const string& name) cons
 vector<ValueElementPtr> InterfaceElement::getActiveValueElements() const
 {
     vector<ValueElementPtr> activeValueElems;
-    for (ConstElementPtr elem : traverseInheritance())
+    for (ConstElementPtr interface : traverseInheritance())
     {
-        vector<ValueElementPtr> valueElems = elem->asA<InterfaceElement>()->getChildrenOfType<ValueElement>();
+        vector<ValueElementPtr> valueElems = interface->getChildrenOfType<ValueElement>();
         activeValueElems.insert(activeValueElems.end(), valueElems.begin(), valueElems.end());
     }
     return activeValueElems;
@@ -338,7 +341,7 @@ ValuePtr InterfaceElement::getParameterValue(const string& name, const string& t
     }
 
     // Return the value, if any, stored in our declaration.
-    NodeDefPtr decl = getDeclaration(target);
+    ConstNodeDefPtr decl = getDeclaration(target);
     if (decl)
     {
         param = decl->getParameter(name);
@@ -360,7 +363,7 @@ ValuePtr InterfaceElement::getInputValue(const string& name, const string& targe
     }
 
     // Return the value, if any, stored in our declaration.
-    NodeDefPtr decl = getDeclaration(target);
+    ConstNodeDefPtr decl = getDeclaration(target);
     if (decl)
     {
         input = decl->getInput(name);
@@ -407,38 +410,23 @@ void InterfaceElement::unregisterChildElement(ElementPtr child)
     }
 }
 
-NodeDefPtr InterfaceElement::getDeclaration(const string& target) const
+ConstNodeDefPtr InterfaceElement::getDeclaration(const string&) const
 {
-    if (isA<Node>())
-    {
-        return asA<Node>()->getNodeDef(target);
-    }
-    else if (isA<InterfaceElement>())
-    {
-        return asA<InterfaceElement>()->getNodeDef();
-    }
-
     return NodeDefPtr();
 }
 
-bool InterfaceElement::isTypeCompatible(ConstInterfaceElementPtr rhs) const
+bool InterfaceElement::isTypeCompatible(ConstInterfaceElementPtr declaration) const
 {
-    if (getType() != rhs->getType())
+    if (getType() != declaration->getType())
     {
         return false;
     }
-    for (ParameterPtr param : getActiveParameters())
+    for (ValueElementPtr value : getActiveValueElements())
     {
-        ParameterPtr matchingParam = rhs->getActiveParameter(param->getName());
-        if (matchingParam && matchingParam->getType() != param->getType())
-        {
-            return false;
-        }
-    }
-    for (InputPtr input : getActiveInputs())
-    {
-        InputPtr matchingInput = rhs->getActiveInput(input->getName());
-        if (matchingInput && matchingInput->getType() != input->getType())
+        ValueElementPtr declarationValue = declaration->getActiveValueElement(value->getName());
+        if (!declarationValue ||
+            declarationValue->getCategory() != value->getCategory() ||
+            declarationValue->getType() != value->getType())
         {
             return false;
         }

@@ -5,6 +5,8 @@
 
 #include <MaterialXTest/Catch/catch.hpp>
 
+#include <MaterialXFormat/Environ.h>
+#include <MaterialXFormat/File.h>
 #include <MaterialXFormat/XmlIo.h>
 
 namespace mx = MaterialX;
@@ -31,7 +33,12 @@ TEST_CASE("Load content", "[xmlio]")
         "BxDF/Disney_BRDF_2012.mtlx",
         "BxDF/Disney_BSDF_2015.mtlx",
     };
-    std::string searchPath = "documents/Libraries;documents/Examples";
+
+    std::string searchPath = "documents/Libraries/stdlib" + 
+                             mx::PATH_LIST_SEPARATOR + 
+                             "documents/Libraries/stdlib/osl" + 
+                             mx::PATH_LIST_SEPARATOR + 
+                             "documents/Examples";
 
     // Read the standard library.
     std::vector<mx::DocumentPtr> libs;
@@ -39,7 +46,13 @@ TEST_CASE("Load content", "[xmlio]")
     {
         mx::DocumentPtr lib = mx::createDocument();
         mx::readFromXmlFile(lib, filename, searchPath);
-        REQUIRE(lib->validate());
+        std::string message;
+        bool docValid = lib->validate(&message);
+        if (!docValid)
+        {
+            WARN("[" + filename + "] " + message);
+        }
+        REQUIRE(docValid);
         libs.push_back(lib);
     }
 
@@ -94,7 +107,9 @@ TEST_CASE("Load content", "[xmlio]")
         }
 
         // Serialize to XML.
-        std::string xmlString = mx::writeToXmlString(doc, false);
+        mx::XmlWriteOptions writeOptions;
+        writeOptions.writeXIncludeEnable = false;
+        std::string xmlString = mx::writeToXmlString(doc, &writeOptions);
 
         // Verify that the serialized document is identical.
         mx::DocumentPtr writtenDoc = mx::createDocument();
@@ -130,15 +145,16 @@ TEST_CASE("Load content", "[xmlio]")
             }
 
             mx::TypedElementPtr typedElem = elem->asA<mx::TypedElement>();
-            mx::NodePtr node = elem->asA<mx::Node>();
             if (typedElem && typedElem->hasType() && !typedElem->isMultiOutputType())
             {
                 if (!typedElem->getTypeDef())
                 {
-                    WARN("[" + node->getActiveSourceUri() + "] TypedElement " + node->getName() + " has no matching TypeDef");
+                    WARN("[" + typedElem->getActiveSourceUri() + "] TypedElement " + typedElem->getName() + " has no matching TypeDef");
                     referencesValid = false;
                 }
             }
+
+            mx::NodePtr node = elem->asA<mx::Node>();
             if (node)
             {
                 if (!node->getNodeDef())
@@ -170,16 +186,27 @@ TEST_CASE("Load content", "[xmlio]")
     // Read document without XIncludes.
     mx::DocumentPtr flatDoc = mx::createDocument();
     readOptions = mx::XmlReadOptions();
-    readOptions.readXIncludes = false;
+    readOptions.readXIncludeFunction = nullptr;
     mx::readFromXmlFile(flatDoc, filename, searchPath, &readOptions);
     REQUIRE(*flatDoc != *doc);
+
+    // Read document using environment search path.
+    mx::setEnviron(mx::MATERIALX_SEARCH_PATH_ENV_VAR, searchPath);
+    mx::DocumentPtr envDoc = mx::createDocument();
+    mx::readFromXmlFile(envDoc, filename);
+    REQUIRE(*envDoc == *doc);
+    mx::removeEnviron(mx::MATERIALX_SEARCH_PATH_ENV_VAR);
+    REQUIRE_THROWS_AS(mx::readFromXmlFile(envDoc, filename), mx::ExceptionFileMissing&);
 
     // Serialize to XML with a custom predicate that skips images.
     auto skipImages = [](mx::ElementPtr elem)
     {
         return !elem->isA<mx::Node>("image");
     };
-    std::string xmlString = mx::writeToXmlString(doc, false, skipImages);
+    mx::XmlWriteOptions writeOptions;
+    writeOptions.writeXIncludeEnable = false;
+    writeOptions.elementPredicate = skipImages;
+    std::string xmlString = mx::writeToXmlString(doc, &writeOptions);
         
     // Reconstruct and verify that the document contains no images.
     mx::DocumentPtr writtenDoc = mx::createDocument();

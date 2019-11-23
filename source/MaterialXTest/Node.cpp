@@ -8,6 +8,7 @@
 #include <MaterialXCore/Definition.h>
 #include <MaterialXCore/Document.h>
 
+#include <MaterialXFormat/File.h>
 #include <MaterialXFormat/XmlIo.h>
 
 namespace mx = MaterialX;
@@ -73,11 +74,17 @@ TEST_CASE("Node", "[node]")
 
     // Reference the custom nodedef.
     mx::NodePtr custom = doc->addNodeInstance(customNodeDef);
+    REQUIRE(custom->getNodeDefString() == customNodeDef->getName());
     REQUIRE(custom->getNodeDef()->getNodeGroup() == mx::PROCEDURAL_NODE_GROUP);
     REQUIRE(custom->getParameterValue("octaves")->isA<int>());
     REQUIRE(custom->getParameterValue("octaves")->asA<int>() == 3);
     custom->setParameterValue("octaves", 5);
     REQUIRE(custom->getParameterValue("octaves")->asA<int>() == 5);
+
+    // Remove the nodedef attribute from the node, requiring that it fall back
+    // to type and version matching.
+    custom->removeAttribute(mx::NodeDef::NODE_DEF_ATTRIBUTE);
+    REQUIRE(custom->getNodeDef() == customNodeDef);
 
     // Set nodedef and node version strings.
     customNodeDef->setVersionString("2.0");
@@ -130,9 +137,11 @@ TEST_CASE("Node", "[node]")
 
 TEST_CASE("Flatten", "[nodegraph]")
 {
+    std::string searchPath = "documents/Examples" + mx::PATH_LIST_SEPARATOR + "documents/Libraries/stdlib";
+
     // Read the example file.
     mx::DocumentPtr doc = mx::createDocument();
-    mx::readFromXmlFile(doc, "SubGraphs.mtlx", "documents/Examples;documents/Libraries");
+    mx::readFromXmlFile(doc, "SubGraphs.mtlx", searchPath);
 
     // Find the example graph.
     mx::NodeGraphPtr graph = doc->getNodeGraph("subgraph_ex1");
@@ -168,7 +177,7 @@ TEST_CASE("Flatten", "[nodegraph]")
             REQUIRE(isAtomic);
         }
     }
-    REQUIRE(totalNodeCount == 19);
+    REQUIRE(totalNodeCount == 15);
 }
 
 TEST_CASE("Topological sort", "[nodegraph]")

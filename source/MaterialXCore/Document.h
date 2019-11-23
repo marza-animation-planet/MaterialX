@@ -49,7 +49,7 @@ class Document : public GraphElement
     virtual void initialize();
 
     /// Create a deep copy of the document.
-    virtual DocumentPtr copy()
+    virtual DocumentPtr copy() const
     {
         DocumentPtr doc = createDocument<Document>();
         doc->copyContentFrom(getSelf());
@@ -63,7 +63,7 @@ class Document : public GraphElement
     /// @param copyOptions An optional pointer to a CopyOptions object.
     ///    If provided, then the given options will affect the behavior of the
     ///    import function.  Defaults to a null pointer.
-    void importLibrary(ConstDocumentPtr library, const class CopyOptions* copyOptions = nullptr);
+    void importLibrary(ConstDocumentPtr library, const CopyOptions* copyOptions = nullptr);
 
     /// @}
     /// @name NodeGraph Elements
@@ -167,6 +167,42 @@ class Document : public GraphElement
     void removeGeomInfo(const string& name)
     {
         removeChildOfType<GeomInfo>(name);
+    }
+
+    /// Return the value of a geometric attribute for the given geometry string.
+    ValuePtr getGeomAttrValue(const string& geomAttrName, const string& geom = UNIVERSAL_GEOM_NAME) const;
+
+    /// @}
+    /// @name GeomPropDef Elements
+    /// @{
+
+    /// Add a GeomPropDef to the document.
+    /// @param name The name of the new GeomPropDef.
+    /// @param node The geometric node to use for the GeomPropDef.
+    /// @return A shared pointer to the new GeomPropDef.
+    GeomPropDefPtr addGeomPropDef(const string& name, const string& node)
+    {
+        GeomPropDefPtr geomProp = addChild<GeomPropDef>(name);
+        geomProp->setNode(node);
+        return geomProp;
+    }
+
+    /// Return the GeomPropDef, if any, with the given name.
+    GeomPropDefPtr getGeomPropDef(const string& name) const
+    {
+        return getChildOfType<GeomPropDef>(name);
+    }
+
+    /// Return a vector of all GeomPropDef elements in the document.
+    vector<GeomPropDefPtr> getGeomPropDefs() const
+    {
+        return getChildrenOfType<GeomPropDef>();
+    }
+
+    /// Remove the GeomPropDef, if any, with the given name.
+    void removeGeomPropDef(const string& name)
+    {
+        removeChildOfType<GeomPropDef>(name);
     }
 
     /// @}
@@ -481,12 +517,6 @@ class Document : public GraphElement
     /// @name Callbacks
     /// @{
 
-    /// Enable all observer callbacks		
-    virtual void enableCallbacks() { }
-    
-    /// Disable all observer callbacks
-    virtual void disableCallbacks() { }
-
     /// Called when an element is added to the element tree.
     virtual void onAddElement(ElementPtr parent, ElementPtr elem);
 
@@ -499,8 +529,11 @@ class Document : public GraphElement
     /// Called when an attribute of an element is removed.
     virtual void onRemoveAttribute(ElementPtr elem, const string& attrib);
 
-    /// Called when a document is initialized.
-    virtual void onInitialize() { }
+    /// Called when content is copied into an element.
+    virtual void onCopyContent(ElementPtr elem);
+
+    /// Called when content is cleared from an element.
+    virtual void onClearContent(ElementPtr elem);
 
     /// Called when data is read into the current document.
     virtual void onRead() { }
@@ -513,6 +546,12 @@ class Document : public GraphElement
 
     /// Called after a set of document updates is performed.
     virtual void onEndUpdate() { }
+
+    /// Enable observer callbacks		
+    virtual void enableCallbacks() { }
+    
+    /// Disable observer callbacks
+    virtual void disableCallbacks() { }
 
     /// @}
 

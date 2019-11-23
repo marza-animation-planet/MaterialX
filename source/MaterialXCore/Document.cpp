@@ -70,9 +70,9 @@ class Document::Cache
             // Traverse the document to build a new cache.
             for (ElementPtr elem : doc.lock()->traverseTree())
             {
-                string nodeName = elem->getAttribute(PortElement::NODE_NAME_ATTRIBUTE);
-                string nodeString = elem->getAttribute(NodeDef::NODE_ATTRIBUTE);
-                string nodeDefString = elem->getAttribute(InterfaceElement::NODE_DEF_ATTRIBUTE);
+                const string& nodeName = elem->getAttribute(PortElement::NODE_NAME_ATTRIBUTE);
+                const string& nodeString = elem->getAttribute(NodeDef::NODE_ATTRIBUTE);
+                const string& nodeDefString = elem->getAttribute(InterfaceElement::NODE_DEF_ATTRIBUTE);
 
                 if (!nodeName.empty())
                 {
@@ -97,7 +97,7 @@ class Document::Cache
                 if (!nodeDefString.empty())
                 {
                     InterfaceElementPtr interface = elem->asA<InterfaceElement>();
-                    if (interface)
+                    if (interface && (interface->isA<Implementation>() || interface->isA<NodeGraph>()))
                     {
                         implementationMap.insert(std::pair<string, InterfaceElementPtr>(
                             interface->getQualifiedName(nodeDefString),
@@ -139,10 +139,6 @@ void Document::initialize()
 
     DocumentPtr doc = getDocument();
     _cache->doc = doc;
-
-    // Handle change notifications.
-    ScopedUpdate update(doc);
-    onInitialize();
 
     clearContent();
     setVersionString(DOCUMENT_VERSION_STRING);
@@ -208,6 +204,24 @@ vector<PortElementPtr> Document::getMatchingPorts(const string& nodeName) const
 
     // Return the matches.
     return ports;
+}
+
+ValuePtr Document::getGeomAttrValue(const string& geomAttrName, const string& geom) const
+{
+    ValuePtr value;
+    for (GeomInfoPtr geomInfo : getGeomInfos())
+    {
+        if (!geomStringsMatch(geom, geomInfo->getActiveGeom()))
+        {
+            continue;
+        }
+        GeomAttrPtr geomAttr = geomInfo->getGeomAttr(geomAttrName);
+        if (geomAttr)
+        {
+            value = geomAttr->getValue();
+        }
+    }
+    return value;
 }
 
 vector<NodeDefPtr> Document::getMatchingNodeDefs(const string& nodeName) const
@@ -350,7 +364,7 @@ void Document::upgradeVersion()
                     NodeDefPtr nodeDef = updateChildSubclass<NodeDef>(elem, child);
                     if (nodeDef->hasAttribute("shadertype"))
                     {
-                        nodeDef->setType(nodeDef->getAttribute("shadertype") + "shader");
+                        nodeDef->setType(SURFACE_SHADER_TYPE_STRING);
                         nodeDef->removeAttribute("shadertype");
                     }
                     if (nodeDef->hasAttribute("shaderprogram"))
@@ -418,12 +432,8 @@ void Document::upgradeVersion()
                     {
                         for (ShaderRefPtr shaderRef : mat->getShaderRefs())
                         {
-                            if (nodeDef == shaderRef->getNodeDef())
+                            if (shaderRef->getNodeDef() == nodeDef && !shaderRef->getChild(input->getName()))
                             {
-                                if (shaderRef->getChild(input->getName()))
-                                {
-                                    shaderRef = shaderRef;
-                                }
                                 BindInputPtr bind = shaderRef->addBindInput(input->getName(), input->getType());
                                 bind->setNodeGraphString(input->getAttribute("opgraph"));
                                 bind->setOutputString(input->getAttribute("graphoutput"));
@@ -434,6 +444,38 @@ void Document::upgradeVersion()
                     input->removeAttribute("graphoutput");
                 }
             }
+        }
+
+        // Combine udim assignments into udim sets.
+        if (getGeomAttrValue("udim") && !getGeomAttrValue("udimset"))
+        {
+            StringSet udimSet;
+            for (GeomInfoPtr geomInfo : getGeomInfos())
+            {
+                for (GeomAttrPtr geomAttr : geomInfo->getGeomAttrs())
+                {
+                    if (geomAttr->getName() == "udim")
+                    {
+                        udimSet.insert(geomAttr->getValueString());
+                    }
+                }
+            }
+
+            std::string udimSetString;
+            for (const std::string& udim : udimSet)
+            {
+                if (udimSetString.empty())
+                {
+                    udimSetString = udim;
+                }
+                else
+                {
+                    udimSetString += ", " + udim;
+                }
+            }
+
+            GeomInfoPtr udimSetInfo = addGeomInfo();
+            udimSetInfo->setGeomAttrValue("udimset", udimSetString, getTypeString<StringVec>());
         }
 
         minorVersion = 34;
@@ -481,6 +523,13 @@ void Document::upgradeVersion()
                 {
                     valueElem->setValueString(UNIVERSAL_GEOM_NAME);
                 }
+                if (valueElem->getType() == FILENAME_TYPE_STRING)
+                {
+                    StringMap stringMap;
+                    stringMap["%UDIM"] = UDIM_TOKEN;
+                    stringMap["%UVTILE"] = UV_TILE_TOKEN;
+                    valueElem->setValueString(replaceSubstrings(valueElem->getValueString(), stringMap));
+                }
             }
 
             vector<ElementPtr> origChildren = elem->getChildren();
@@ -491,20 +540,23 @@ void Document::upgradeVersion()
                     for (ShaderRefPtr shaderRef : material->getShaderRefs())
                     {
                         NodeDefPtr nodeDef = shaderRef->getNodeDef();
-                        for (ValueElementPtr activeValue : nodeDef->getActiveValueElements())
+                        if (nodeDef)
                         {
-                            if (activeValue->getAttribute("publicname") == child->getName() &&
-                                !shaderRef->getChild(child->getName()))
+                            for (ValueElementPtr activeValue : nodeDef->getActiveValueElements())
                             {
-                                if (activeValue->isA<Parameter>())
+                                if (activeValue->getAttribute("publicname") == child->getName() &&
+                                    !shaderRef->getChild(child->getName()))
                                 {
-                                    BindParamPtr bindParam = shaderRef->addBindParam(activeValue->getName(), activeValue->getType());
-                                    bindParam->setValueString(child->getAttribute("value"));
-                                }
-                                else if (activeValue->isA<Input>())
-                                {
-                                    BindInputPtr bindInput = shaderRef->addBindInput(activeValue->getName(), activeValue->getType());
-                                    bindInput->setValueString(child->getAttribute("value"));
+                                    if (activeValue->isA<Parameter>())
+                                    {
+                                        BindParamPtr bindParam = shaderRef->addBindParam(activeValue->getName(), activeValue->getType());
+                                        bindParam->setValueString(child->getAttribute("value"));
+                                    }
+                                    else if (activeValue->isA<Input>())
+                                    {
+                                        BindInputPtr bindInput = shaderRef->addBindInput(activeValue->getName(), activeValue->getType());
+                                        bindInput->setValueString(child->getAttribute("value"));
+                                    }
                                 }
                             }
                         }
@@ -549,6 +601,16 @@ void Document::onSetAttribute(ElementPtr, const string&, const string&)
 }
 
 void Document::onRemoveAttribute(ElementPtr, const string&)
+{
+    _cache->valid = false;
+}
+
+void Document::onCopyContent(ElementPtr)
+{
+    _cache->valid = false;
+}
+
+void Document::onClearContent(ElementPtr)
 {
     _cache->valid = false;
 }

@@ -116,8 +116,26 @@ class Node : public InterfaceElement
         return getInputCount();
     }
 
+    /// Given an edge connection return the NodeDef output corresponding to the 
+    /// output the edge is connected to. This is only valid if the NodeDef has
+    /// explicit outputs defined, e.g. multiple outputs or an explicitly named 
+    /// output. If this is not the case, nulltptr is returned, which implies 
+    /// the node is a standard node with a single implicit output.
+    OutputPtr getNodeDefOutput(const Edge& edge);
+
     /// Return a vector of all downstream ports that connect to this node.
     vector<PortElementPtr> getDownstreamPorts() const;
+
+    /// @}
+    /// @name Utility
+    /// @{
+
+    /// Return the first declaration of this interface, optionally filtered
+    ///    by the given target name.
+    ConstNodeDefPtr getDeclaration(const string& target = EMPTY_STRING) const override
+    {
+        return getNodeDef(target);
+    }
 
     /// @}
     /// @name Validation
@@ -168,7 +186,9 @@ class GraphElement : public InterfaceElement
     /// Add a Node that is an instance of the given NodeDef.
     NodePtr addNodeInstance(ConstNodeDefPtr nodeDef, const string& name = EMPTY_STRING)
     {
-        return addNode(nodeDef->getNodeString(), name, nodeDef->getType());
+        NodePtr node = addNode(nodeDef->getNodeString(), name, nodeDef->getType());
+        node->setNodeDefString(nodeDef->getName());
+        return node;
     }
 
     /// Return the Node, if any, with the given name.
@@ -224,6 +244,30 @@ class NodeGraph : public GraphElement
     {
     }
     virtual ~NodeGraph() { }
+
+    /// @name NodeDef References
+    /// @{
+
+    /// Set the NodeDef element referenced by this NodeGraph.
+    void setNodeDef(ConstNodeDefPtr nodeDef);
+
+    /// Return the NodeDef element referenced by this NodeGraph.
+    NodeDefPtr getNodeDef() const;
+
+    /// Return the first implementation for this node graph
+    /// @return An implementation for this node, or an empty shared pointer if
+    ///    none was found.  
+    InterfaceElementPtr getImplementation() const;
+
+    /// @}
+    /// @name Utility
+    /// @{
+
+    /// Return the first declaration of this interface, optionally filtered
+    ///    by the given target name.
+    ConstNodeDefPtr getDeclaration(const string& target = EMPTY_STRING) const override;
+
+    /// @}
 
   public:
     static const string CATEGORY;

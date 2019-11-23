@@ -68,6 +68,10 @@ string Node::getConnectedNodeName(const string& inputName) const
 
 NodeDefPtr Node::getNodeDef(const string& target) const
 {
+    if (hasNodeDefString())
+    {
+        return resolveRootNameReference<NodeDef>(getNodeDefString());
+    }
     vector<NodeDefPtr> nodeDefs = getDocument()->getMatchingNodeDefs(getQualifiedName(getCategory()));
     vector<NodeDefPtr> secondary = getDocument()->getMatchingNodeDefs(getCategory());
     nodeDefs.insert(nodeDefs.end(), secondary.begin(), secondary.end());
@@ -96,6 +100,21 @@ Edge Node::getUpstreamEdge(ConstMaterialPtr material, size_t index) const
     }
 
     return NULL_EDGE;
+}
+
+OutputPtr Node::getNodeDefOutput(const Edge& edge)
+{
+    const ElementPtr connectingElement = edge.getConnectingElement();
+    const PortElementPtr input = connectingElement ? connectingElement->asA<PortElement>() : nullptr;
+    if (input)
+    {
+        NodeDefPtr nodeDef = getNodeDef();
+        if (nodeDef)
+        {
+            return nodeDef->getOutput(input->getOutputString());
+        }
+    }
+    return OutputPtr();
 }
 
 vector<PortElementPtr> Node::getDownstreamPorts() const
@@ -350,6 +369,38 @@ string GraphElement::asStringDot() const
     dot += "}\n";
 
     return dot;
+}
+
+//
+// NodeGraph methods
+//
+
+void NodeGraph::setNodeDef(ConstNodeDefPtr nodeDef)
+{
+    if (nodeDef)
+    {
+        setNodeDefString(nodeDef->getName());
+    }
+    else
+    {
+        removeAttribute(NODE_DEF_ATTRIBUTE);
+    }
+}
+
+NodeDefPtr NodeGraph::getNodeDef() const
+{
+    return resolveRootNameReference<NodeDef>(getNodeDefString());
+}
+
+ConstNodeDefPtr NodeGraph::getDeclaration(const string&) const
+{
+    return getNodeDef();
+}
+
+InterfaceElementPtr NodeGraph::getImplementation() const
+{
+    NodeDefPtr nodedef = getNodeDef();
+    return nodedef ? nodedef->getImplementation() : InterfaceElementPtr();
 }
 
 } // namespace MaterialX

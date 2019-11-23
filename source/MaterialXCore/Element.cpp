@@ -24,7 +24,14 @@ const string Element::NAMESPACE_ATTRIBUTE = "namespace";
 const string TypedElement::TYPE_ATTRIBUTE = "type";
 const string ValueElement::VALUE_ATTRIBUTE = "value";
 const string ValueElement::INTERFACE_NAME_ATTRIBUTE = "interfacename";
+const string ValueElement::ENUM_ATTRIBUTE = "enum";
 const string ValueElement::IMPLEMENTATION_NAME_ATTRIBUTE = "implname";
+const string ValueElement::IMPLEMENTATION_TYPE_ATTRIBUTE = "impltype";
+const string ValueElement::ENUM_VALUES_ATTRIBUTE = "enumvalues";
+const string ValueElement::UI_NAME_ATTRIBUTE = "uiname";
+const string ValueElement::UI_FOLDER_ATTRIBUTE = "uifolder";
+const string ValueElement::UI_MIN_ATTRIBUTE = "uimin";
+const string ValueElement::UI_MAX_ATTRIBUTE = "uimax";
 
 Element::CreatorMap Element::_creatorMap;
 
@@ -368,32 +375,42 @@ InheritanceIterator Element::traverseInheritance() const
 
 void Element::copyContentFrom(ConstElementPtr source, const CopyOptions* copyOptions)
 {
-    _sourceUri = source->_sourceUri;
-    for (const string& attr : source->getAttributeNames())
-    {
-        setAttribute(attr, source->getAttribute(attr));
-    }
+    DocumentPtr doc = getDocument();
     bool skipDuplicateElements = copyOptions && copyOptions->skipDuplicateElements;
+
+    // Handle change notifications.
+    ScopedUpdate update(doc);
+    doc->onCopyContent(getSelf());
+
+    _sourceUri = source->_sourceUri;
+    _attributeMap = source->_attributeMap;
+    _attributeOrder = source->_attributeOrder;
+
     for (ElementPtr child : source->getChildren())
     {
-        std::string childName = child->getName();
-        if (skipDuplicateElements && getChild(childName))
+        const string& name = child->getName();
+        if (skipDuplicateElements && getChild(name))
         {
             continue;
         }
-        addChildOfCategory(child->getCategory(), childName)->copyContentFrom(child);
+        ElementPtr childCopy = addChildOfCategory(child->getCategory(), name);
+        childCopy->copyContentFrom(child);
     }
 }
 
 void Element::clearContent()
 {
+    DocumentPtr doc = getDocument();
+
+    // Handle change notifications.
+    ScopedUpdate update(doc);
+    doc->onClearContent(getSelf());
+
     _sourceUri = EMPTY_STRING;
-    StringVec attributeNames = getAttributeNames();
+    _attributeMap.clear();
+    _attributeOrder.clear();
+
     vector<ElementPtr> children = getChildren();
-    for (const string& attr : attributeNames)
-    {
-        removeAttribute(attr);
-    }
     for (ElementPtr child : children)
     {
         removeChild(child->getName());
@@ -421,27 +438,43 @@ bool Element::validate(string* message) const
     return res;
 }
 
-StringResolverPtr Element::createStringResolver(const string& geom) const
+StringResolverPtr Element::createStringResolver(const string& geom,
+                                                ConstMaterialPtr material,
+                                                const string& target,
+                                                const string& type) const
 {
     StringResolverPtr resolver = std::make_shared<StringResolver>();
-    StringMap stringMap;
 
     // Compute file and geom prefixes as this scope.
     resolver->setFilePrefix(getActiveFilePrefix());
     resolver->setGeomPrefix(getActiveGeomPrefix());
 
-    // If a geometry name is specified, then use it to initialize the filename map.
+    // If a geometry name is specified, then apply it to the filename map.
     if (!geom.empty())
     {
-        ConstDocumentPtr doc = getDocument();
-        for (GeomInfoPtr geomInfo : doc->getGeomInfos())
+        for (GeomInfoPtr geomInfo : getDocument()->getGeomInfos())
         {
             if (!geomStringsMatch(geom, geomInfo->getActiveGeom()))
                 continue;
             for (TokenPtr token : geomInfo->getTokens())
             {
-                string key = "%" + token->getName();
+                string key = "<" + token->getName() + ">";
                 string value = token->getResolvedValueString();
+                resolver->setFilenameSubstitution(key, value);
+            }
+        }
+    }
+
+    // If a material is specified, then apply it to the filename map.
+    if (material)
+    {
+        for (TokenPtr token : material->getPrimaryShaderTokens(target, type))
+        {
+            ValuePtr boundValue = token->getBoundValue(material);
+            if (boundValue->isA<string>())
+            {
+                string key = "[" + token->getName() + "]";
+                string value = boundValue->asA<string>();
                 resolver->setFilenameSubstitution(key, value);
             }
         }
@@ -492,6 +525,10 @@ TypeDefPtr TypedElement::getTypeDef() const
 
 string ValueElement::getResolvedValueString(StringResolverPtr resolver) const
 {
+    if (!StringResolver::isResolvedType(getType()))
+    {
+        return getValueString();
+    }
     if (!resolver)
     {
         resolver = createStringResolver();
@@ -521,9 +558,11 @@ ValuePtr ValueElement::getDefaultValue() const
     }
 
     // Return the value, if any, stored in our declaration.
-    if (getParent()->isA<InterfaceElement>())
+    ConstElementPtr parent = getParent();
+    ConstInterfaceElementPtr interface = parent ? parent->asA<InterfaceElement>() : nullptr;
+    if (interface)
     {
-        NodeDefPtr decl = getParent()->asA<InterfaceElement>()->getDeclaration();
+        ConstNodeDefPtr decl = interface->getDeclaration();
         if (decl)
         {
             ValueElementPtr value = decl->getActiveValueElement(getName());
@@ -544,6 +583,39 @@ bool ValueElement::validate(string* message) const
         validateRequire(getValue() != nullptr, res, message, "Invalid value");
     }
     return TypedElement::validate(message) && res;
+}
+
+//
+// Token methods
+//
+
+Edge Token::getUpstreamEdge(ConstMaterialPtr material, size_t index) const
+{
+    if (material && index < getUpstreamEdgeCount())
+    {
+        ConstElementPtr parent = getParent();
+        ConstInterfaceElementPtr interface = parent ? parent->asA<InterfaceElement>() : nullptr;
+        ConstNodeDefPtr nodeDef = interface ? interface->getDeclaration() : nullptr;
+        if (nodeDef)
+        {
+            // Apply BindToken elements to the Token.
+            for (ShaderRefPtr shaderRef : material->getActiveShaderRefs())
+            {
+                if (shaderRef->getNodeDef()->hasInheritedBase(nodeDef))
+                {
+                    for (BindTokenPtr bindToken : shaderRef->getBindTokens())
+                    {
+                        if (bindToken->getName() == getName() && bindToken->hasValue())
+                        {
+                            return Edge(getSelfNonConst(), nullptr, bindToken);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    return NULL_EDGE;
 }
 
 //
@@ -584,10 +656,10 @@ bool targetStringsMatch(const string& target1, const string& target2)
 
     StringVec vec1 = splitString(target1, ARRAY_VALID_SEPARATORS);
     StringVec vec2 = splitString(target2, ARRAY_VALID_SEPARATORS);
-    std::set<string> set1(vec1.begin(), vec1.end());
-    std::set<string> set2(vec2.begin(), vec2.end());
+    StringSet set1(vec1.begin(), vec1.end());
+    StringSet set2(vec2.begin(), vec2.end());
 
-    std::set<string> matches;
+    StringSet matches;
     std::set_intersection(set1.begin(), set1.end(), set2.begin(), set2.end(), 
                           std::inserter(matches, matches.end()));
     return !matches.empty();
@@ -630,11 +702,13 @@ INSTANTIATE_SUBCLASS(T)
 
 INSTANTIATE_CONCRETE_SUBCLASS(BindParam, "bindparam")
 INSTANTIATE_CONCRETE_SUBCLASS(BindInput, "bindinput")
+INSTANTIATE_CONCRETE_SUBCLASS(BindToken, "bindtoken")
 INSTANTIATE_CONCRETE_SUBCLASS(Collection, "collection")
 INSTANTIATE_CONCRETE_SUBCLASS(Document, "materialx")
 INSTANTIATE_CONCRETE_SUBCLASS(GenericElement, "generic")
 INSTANTIATE_CONCRETE_SUBCLASS(GeomAttr, "geomattr")
 INSTANTIATE_CONCRETE_SUBCLASS(GeomInfo, "geominfo")
+INSTANTIATE_CONCRETE_SUBCLASS(GeomPropDef, "geompropdef")
 INSTANTIATE_CONCRETE_SUBCLASS(Implementation, "implementation")
 INSTANTIATE_CONCRETE_SUBCLASS(Input, "input")
 INSTANTIATE_CONCRETE_SUBCLASS(Look, "look")

@@ -13,6 +13,8 @@
 
 #include <MaterialXCore/Element.h>
 
+#include <MaterialXCore/Geom.h>
+
 namespace MaterialX
 {
 
@@ -201,9 +203,43 @@ class Input : public PortElement
     }
 
     /// @}
+    /// @name Default Geometric Property
+    /// @{
+
+    /// Set the defaultgeomprop string for the input.
+    void setDefaultGeomPropString(const string& geomprop)
+    {
+        setAttribute(DEFAULT_GEOM_PROP_ATTRIBUTE, geomprop);
+    }
+
+    /// Return true if the given input has a defaultgeomprop string.
+    bool hasDefaultGeomPropString() const
+    {
+        return hasAttribute(DEFAULT_GEOM_PROP_ATTRIBUTE);
+    }
+
+    /// Return the defaultgeomprop string for the input.
+    const string& getDefaultGeomPropString() const
+    {
+        return getAttribute(DEFAULT_GEOM_PROP_ATTRIBUTE);
+    }
+
+    /// Return the GeomPropDef element to use, if defined for this input.
+    GeomPropDefPtr getDefaultGeomProp() const;
+
+    /// @}
+    /// @name Validation
+    /// @{
+
+    /// Validate that the given element tree, including all descendants, is
+    /// consistent with the MaterialX specification.
+    bool validate(string* message = nullptr) const override;
+
+    /// @}
 
   public:
     static const string CATEGORY;
+    static const string DEFAULT_GEOM_PROP_ATTRIBUTE;
 };
 
 /// @class Output
@@ -293,12 +329,7 @@ class InterfaceElement : public TypedElement
         return getAttribute(NODE_DEF_ATTRIBUTE);
     }
 
-    /// Set the NodeDef element for the interface.
-    void setNodeDef(ConstNodeDefPtr nodeDef);
-
-    /// Return the NodeDef element for the interface.
-    NodeDefPtr getNodeDef() const;
-
+    /// @}
     /// @name Parameters
     /// @{
     
@@ -545,7 +576,7 @@ class InterfaceElement : public TypedElement
         TokenPtr token = getToken(name);
         if (!token)
             token = addToken(name);
-        token->setValue<std::string>(value);
+        token->setValue<string>(value);
         return token;
     }
 
@@ -567,20 +598,17 @@ class InterfaceElement : public TypedElement
     ///    the declarations that are considered.
     /// @return A shared pointer to nodedef, or an empty shared pointer if
     ///    no declaration was found.
-    NodeDefPtr getDeclaration(const string& target = EMPTY_STRING) const;
+    virtual ConstNodeDefPtr getDeclaration(const string& target = EMPTY_STRING) const;
 
-    /// Return true if the given interface element is type compatible with
-    /// this one.  This may be used to test, for example, whether a NodeDef
-    /// and Node may be used together.
+    /// Return true if this interface instance is type compatible with the given
+    /// interface declaration.  This may be used to test, for example, whether a
+    /// Node is an instantiation of a given NodeDef.
     ///
-    /// If the type string of the given interface element differs from this
-    /// one, then false is returned.
-    ///
-    /// If the two interface elements have child Parameter or Input elements
-    /// with identical names but different types, then false is returned.  Note
-    /// that a Parameter or Input that is present in only one of the two
-    /// interfaces does not affect their type compatibility.
-    bool isTypeCompatible(ConstInterfaceElementPtr rhs) const;
+    /// If the type string of the instance differs from that of the declaration,
+    /// then false is returned.  If the instance possesses a Parameter or Input
+    /// with no Parameter or Input of matching type in the declaration, then
+    /// false is returned.
+    bool isTypeCompatible(ConstInterfaceElementPtr declaration) const;
 
     /// @}
 

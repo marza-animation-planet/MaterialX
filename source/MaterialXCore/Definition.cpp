@@ -36,22 +36,35 @@ InterfaceElementPtr NodeDef::getImplementation(const string& target, const strin
     vector<InterfaceElementPtr> interfaces = getDocument()->getMatchingImplementations(getQualifiedName(getName()));
     vector<InterfaceElementPtr> secondary = getDocument()->getMatchingImplementations(getName());
     interfaces.insert(interfaces.end(), secondary.begin(), secondary.end());
+
+    // Search for the first implementation which matches a given language string.
+    // If no language is specified then return the first implementation found.
+    bool matchLanguage = !language.empty();
     for (InterfaceElementPtr interface : interfaces)
     {
-        if (!targetStringsMatch(interface->getTarget(), target) ||
+        ImplementationPtr implement = interface->asA<Implementation>();
+        if (!implement||
+            !targetStringsMatch(interface->getTarget(), target) ||
             !isVersionCompatible(interface))
         {
             continue;
         }
-        if (!language.empty())
+        if (!matchLanguage || 
+            implement->getLanguage() == language)
         {
-            // If the given interface is an implementation element, as opposed to
-            // a node graph, then check for a language string match.
-            ImplementationPtr implement = interface->asA<Implementation>();
-            if (implement && implement->getLanguage() != language)
-            {
-                continue;
-            }
+            return interface;
+        }
+    }
+
+    // Search for a node graph match if no implementation match was found.
+    // There is no language check as node graphs are considered to be language independent.
+    for (InterfaceElementPtr interface : interfaces)
+    {
+        if (interface->isA<Implementation>() || 
+            !targetStringsMatch(interface->getTarget(), target) ||
+            !isVersionCompatible(interface))
+        {
+            continue;
         }
         return interface;
     }
@@ -62,7 +75,7 @@ InterfaceElementPtr NodeDef::getImplementation(const string& target, const strin
 vector<ShaderRefPtr> NodeDef::getInstantiatingShaderRefs() const
 {
     vector<ShaderRefPtr> shaderRefs;
-    for (MaterialPtr mat : getRoot()->getChildrenOfType<Material>())
+    for (MaterialPtr mat : getDocument()->getMaterials())
     {
         for (ShaderRefPtr shaderRef : mat->getShaderRefs())
         {
@@ -101,6 +114,37 @@ bool NodeDef::isVersionCompatible(ConstElementPtr elem) const
         return true;
     }
     return false;
+}
+
+ConstNodeDefPtr NodeDef::getDeclaration(const string&) const
+{
+    return getSelf()->asA<NodeDef>();
+}
+
+//
+// Implementation methods
+//
+
+void Implementation::setNodeDef(ConstNodeDefPtr nodeDef)
+{
+    if (nodeDef)
+    {
+        setNodeDefString(nodeDef->getName());
+    }
+    else
+    {
+        removeAttribute(NODE_DEF_ATTRIBUTE);
+    }
+}
+
+NodeDefPtr Implementation::getNodeDef() const
+{
+    return resolveRootNameReference<NodeDef>(getNodeDefString());
+}
+
+ConstNodeDefPtr Implementation::getDeclaration(const string&) const
+{
+    return getNodeDef();
 }
 
 } // namespace MaterialX

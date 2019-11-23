@@ -24,6 +24,7 @@ extern const string UV_TILE_TOKEN;
 class GeomElement;
 class GeomAttr;
 class GeomInfo;
+class GeomPropDef;
 class Collection;
 class CollectionAdd;
 class CollectionRemove;
@@ -42,6 +43,11 @@ using ConstGeomAttrPtr = shared_ptr<const GeomAttr>;
 using GeomInfoPtr = shared_ptr<GeomInfo>;
 /// A shared pointer to a const GeomInfo
 using ConstGeomInfoPtr = shared_ptr<const GeomInfo>;
+
+/// A shared pointer to a GeomPropDef
+using GeomPropDefPtr = shared_ptr<GeomPropDef>;
+/// A shared pointer to a const GeomPropDef
+using ConstGeomPropDefPtr = shared_ptr<const GeomPropDef>;
 
 /// A shared pointer to a Collection
 using CollectionPtr = shared_ptr<Collection>;
@@ -71,10 +77,10 @@ class GeomPath
     }
 
     /// Construct a path from a geometry name string.
-    explicit GeomPath(const string& geom)
+    explicit GeomPath(const string& geom) :
+        _vec(splitString(geom, GEOM_PATH_SEPARATOR)),
+        _empty(geom.empty())
     {
-        _vec = splitString(geom, GEOM_PATH_SEPARATOR);
-        _empty = geom.empty();
     }
 
     /// Convert a path to a geometry name string.
@@ -317,7 +323,7 @@ class GeomInfo : public GeomElement
         TokenPtr token = getToken(name);
         if (!token)
             token = addToken(name);
-        token->setValue<std::string>(value);
+        token->setValue<string>(value);
         return token;
     }
 
@@ -340,6 +346,123 @@ class GeomAttr : public ValueElement
 
   public:
     static const string CATEGORY;
+};
+
+/// @class GeomPropDef
+/// An element representing a declaration of geometric input data.
+///
+/// A GeomPropDef element contains a reference to a geometric node and a set of
+/// modifiers for that node.  For example, a world-space normal can be declared
+/// as a reference to the "normal" geometric node with a space setting of
+/// "world", or a specific set of texture coordinates can be declared as a
+/// reference to the "texcoord" geometric node with an index setting of "1".
+///
+/// Once a GeomPropDef has been declared it may be referenced by Input elements
+/// through their defaultgeomprop attribute.
+class GeomPropDef : public Element
+{
+  public:
+      GeomPropDef(ElementPtr parent, const string& name) :
+          Element(parent, CATEGORY, name)
+    {
+    }
+    virtual ~GeomPropDef() { }
+
+    /// @name Geometric Node
+    /// @{
+
+    /// Set the geometric node string of this element.
+    void setNode(const string& node)
+    {
+        setAttribute(NODE_ATTRIBUTE, node);
+    }
+
+    /// Return true if this element has a geometric node string.
+    bool hasNode() const
+    {
+        return hasAttribute(NODE_ATTRIBUTE);
+    }
+
+    /// Return the geometric node string of this element.
+    const string& getNode() const
+    {
+        return getAttribute(NODE_ATTRIBUTE);
+    }
+
+    /// @}
+    /// @name Geometric Space
+    /// @{
+
+    /// Set the geometric space string of this element.
+    void setSpace(const string& space)
+    {
+        setAttribute(SPACE_ATTRIBUTE, space);
+    }
+
+    /// Return true if this element has a geometric space string.
+    bool hasSpace() const
+    {
+        return hasAttribute(SPACE_ATTRIBUTE);
+    }
+
+    /// Return the geometric space string of this element.
+    const string& getSpace() const
+    {
+        return getAttribute(SPACE_ATTRIBUTE);
+    }
+
+    /// @}
+    /// @name Geometric Index
+    /// @{
+
+    /// Set the index string of this element.
+    void setIndex(const string& space)
+    {
+        setAttribute(INDEX_ATTRIBUTE, space);
+    }
+
+    /// Return true if this element has an index string.
+    bool hasIndex() const
+    {
+        return hasAttribute(INDEX_ATTRIBUTE);
+    }
+
+    /// Return the index string of this element.
+    const string& getIndex() const
+    {
+        return getAttribute(INDEX_ATTRIBUTE);
+    }
+
+    /// @}
+    /// @name Geometric Attr Name
+    /// @{
+
+    /// Set the attrname string of this element.
+    void setAttrName(const string& space)
+    {
+        setAttribute(ATTR_NAME_ATTRIBUTE, space);
+    }
+
+    /// Return true if this element has an attrname string.
+    bool hasAttrName() const
+    {
+        return hasAttribute(ATTR_NAME_ATTRIBUTE);
+    }
+
+    /// Return the attrname string of this element.
+    const string& getAttrName() const
+    {
+        return getAttribute(ATTR_NAME_ATTRIBUTE);
+    }
+
+    /// @}
+
+  public:
+    static const string CATEGORY;
+    static const string NODE_ATTRIBUTE;
+    static const string SPACE_ATTRIBUTE;
+    static const string INDEX_ATTRIBUTE;
+    static const string ATTR_NAME_ATTRIBUTE;
 };
 
 /// @class Collection
@@ -441,7 +564,7 @@ class Collection : public Element
 
     /// Set the vector of collections that are directly included by
     /// this element.
-    void setIncludeCollections(vector<ConstCollectionPtr> collections);
+    void setIncludeCollections(const vector<ConstCollectionPtr>& collections);
 
     /// Return the vector of collections that are directly included by
     /// this element.
