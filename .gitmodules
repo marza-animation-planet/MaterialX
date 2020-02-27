@@ -1,3 +1,6 @@
 [submodule "excons"]
 	path = excons
 	url = git://github.com/gatgui/excons.git
+[submodule "source/MaterialXView/NanoGUI"]
+	path = source/MaterialXView/NanoGUI
+	url = https://github.com/wjakob/nanogui

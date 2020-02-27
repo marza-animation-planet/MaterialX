@@ -20,7 +20,9 @@ extern const string DEFAULT_TYPE_STRING;
 extern const string FILENAME_TYPE_STRING;
 extern const string GEOMNAME_TYPE_STRING;
 extern const string SURFACE_SHADER_TYPE_STRING;
+extern const string DISPLACEMENT_SHADER_TYPE_STRING;
 extern const string VOLUME_SHADER_TYPE_STRING;
+extern const string LIGHT_SHADER_TYPE_STRING;
 extern const string MULTI_OUTPUT_TYPE_STRING;
 extern const string NONE_TYPE_STRING;
 extern const string VALUE_STRING_TRUE;
@@ -545,6 +547,15 @@ class Matrix33 : public MatrixN<Matrix33, float, 3>
                 m20, m21, m22};
     }
 
+    /// @name Point/Vector/Normal Transformations
+    /// @{
+
+    Vector3 multiply(const Vector3& rhs) const;
+    Vector2 transformPoint(const Vector2& rhs) const;
+    Vector2 transformVector(const Vector2& rhs) const;
+    Vector3 transformNormal(const Vector3& rhs) const;
+
+    /// @}
     /// @name 2D Transformations
     /// @{
 
@@ -557,7 +568,7 @@ class Matrix33 : public MatrixN<Matrix33, float, 3>
     // Create a rotation matrix.
     // @param angle Angle in radians
     static Matrix33 createRotation(float angle);
-    
+
     /// @}
 
   public:
@@ -583,6 +594,15 @@ class Matrix44 : public MatrixN<Matrix44, float, 4>
                 m30, m31, m32, m33};
     }
 
+    /// @name Point/Vector/Normal Transformations
+    /// @{
+
+    Vector4 multiply(const Vector4& rhs) const;
+    Vector3 transformPoint(const Vector3& rhs) const;
+    Vector3 transformVector(const Vector3& rhs) const;
+    Vector3 transformNormal(const Vector3& rhs) const;
+
+    /// @}
     /// @name 3D Transformations
     /// @{
 

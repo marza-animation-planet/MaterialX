@@ -144,18 +144,22 @@ void Document::initialize()
     setVersionString(DOCUMENT_VERSION_STRING);
 }
 
-void Document::importLibrary(ConstDocumentPtr library, const CopyOptions* copyOptions)
+void Document::importLibrary(const ConstDocumentPtr& library, const CopyOptions* copyOptions)
 {
-    bool skipDuplicateElements = copyOptions && copyOptions->skipDuplicateElements;
-    for (ElementPtr child : library->getChildren())
+    bool skipConflictingElements = copyOptions && copyOptions->skipConflictingElements;
+    for (const ConstElementPtr& child : library->getChildren())
     {
         string childName = child->getQualifiedName(child->getName());
-        if (skipDuplicateElements && getChild(childName))
+
+        // Check for duplicate elements.
+        ConstElementPtr previous = getChild(childName);
+        if (previous && skipConflictingElements)
         {
             continue;
         }
 
-        ElementPtr childCopy = addChildOfCategory(child->getCategory(), childName);
+        // Create the imported element.
+        ElementPtr childCopy = addChildOfCategory(child->getCategory(), childName, !previous);
         childCopy->copyContentFrom(child, copyOptions);
         if (!childCopy->hasFilePrefix() && library->hasFilePrefix())
         {
@@ -176,6 +180,12 @@ void Document::importLibrary(ConstDocumentPtr library, const CopyOptions* copyOp
         if (!childCopy->hasSourceUri() && library->hasSourceUri())
         {
             childCopy->setSourceUri(library->getSourceUri());
+        }
+
+        // Check for conflicting elements.
+        if (previous && *previous != *childCopy)
+        {
+            throw Exception("Duplicate element with conflicting content: " + childName);
         }
     }
 }
@@ -424,7 +434,7 @@ void Document::upgradeVersion()
         // Move connections from nodedef inputs to bindinputs.
         for (NodeDefPtr nodeDef : getNodeDefs())
         {
-            for (InputPtr input : nodeDef->getInputs())
+            for (InputPtr input : nodeDef->getActiveInputs())
             {
                 if (input->hasAttribute("opgraph") && input->hasAttribute("graphoutput"))
                 {

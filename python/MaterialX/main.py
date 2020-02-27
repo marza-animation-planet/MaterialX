@@ -1,6 +1,7 @@
 import warnings
 
-from .PyMaterialX import *
+from .PyMaterialXCore import *
+from .PyMaterialXFormat import *
 from .datatype import *
 
 """
@@ -66,7 +67,7 @@ def _setValue(self, value, typeString = ''):
     "Set the typed value of an element."
     method = getattr(self.__class__, "_setValue" + typeToName(value.__class__))
     method(self, value, typeString)
-    
+
 def _getValue(self):
     "Return the typed value of an element."
     value = self._getValue()
@@ -150,7 +151,7 @@ Node.getReferencedNodeDef = _getReferencedNodeDef
 # GraphElement
 #
 
-def _addNode(self, category, name = '', typeString = 'color3'):
+def _addNode(self, category, name = '', typeString = DEFAULT_TYPE_STRING):
     "Add a node to the graph."
     return self._addNode(category, name, typeString)
 
@@ -256,7 +257,6 @@ def _applyStringSubstitutions(self, filename, geom = '/'):
 def _generateRequireString(self):
     """(Deprecated) Generate the require string for a document."""
     warnings.warn("Require strings are no longer supported in MaterialX.", DeprecationWarning, stacklevel = 2)
-    pass
 
 Document.applyStringSubstitutions = _applyStringSubstitutions
 Document.generateRequireString = _generateRequireString

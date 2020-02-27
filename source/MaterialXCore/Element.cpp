@@ -32,6 +32,7 @@ const string ValueElement::UI_NAME_ATTRIBUTE = "uiname";
 const string ValueElement::UI_FOLDER_ATTRIBUTE = "uifolder";
 const string ValueElement::UI_MIN_ATTRIBUTE = "uimin";
 const string ValueElement::UI_MAX_ATTRIBUTE = "uimax";
+const string ValueElement::UI_ADVANCED_ATTRIBUTE = "uiadvanced";
 
 Element::CreatorMap Element::_creatorMap;
 
@@ -261,17 +262,16 @@ template<class T> shared_ptr<const T> Element::asA() const
 }
 
 ElementPtr Element::addChildOfCategory(const string& category,
-                                       const string& name)
+                                       string name,
+                                       bool registerChild)
 {
-    string childName = name;
-    if (childName.empty())
+    if (name.empty())
     {
-        childName = createValidChildName(category + "1");
+        name = createValidChildName(category + "1");
     }
-
-    if (_childMap.count(childName))
+    if (registerChild && _childMap.count(name))
     {
-        throw Exception("Child name is not unique: " + childName);
+        throw Exception("Child name is not unique: " + name);
     }
 
     ElementPtr child;
@@ -280,25 +280,27 @@ ElementPtr Element::addChildOfCategory(const string& category,
     CreatorMap::iterator it = _creatorMap.find(category);
     if (it != _creatorMap.end())
     {
-        child = it->second(getSelf(), childName);
+        child = it->second(getSelf(), name);
     }
 
     // Check for a node within a graph.
     if (!child && isA<GraphElement>())
     {
-        child = createElement<Node>(getSelf(), childName);
+        child = createElement<Node>(getSelf(), name);
         child->setCategory(category);
     }
 
     // If no match was found, then create a generic element.
     if (!child)
     {
-        child = createElement<GenericElement>(getSelf(), childName);
+        child = createElement<GenericElement>(getSelf(), name);
         child->setCategory(category);
     }
 
-    // Register the child.
-    registerChildElement(child);
+    if (registerChild)
+    {
+        registerChildElement(child);
+    }
 
     return child;
 }
@@ -373,10 +375,10 @@ InheritanceIterator Element::traverseInheritance() const
     return InheritanceIterator(getSelf());
 }
 
-void Element::copyContentFrom(ConstElementPtr source, const CopyOptions* copyOptions)
+void Element::copyContentFrom(const ConstElementPtr& source, const CopyOptions* copyOptions)
 {
     DocumentPtr doc = getDocument();
-    bool skipDuplicateElements = copyOptions && copyOptions->skipDuplicateElements;
+    bool skipConflictingElements = copyOptions && copyOptions->skipConflictingElements;
 
     // Handle change notifications.
     ScopedUpdate update(doc);
@@ -386,15 +388,26 @@ void Element::copyContentFrom(ConstElementPtr source, const CopyOptions* copyOpt
     _attributeMap = source->_attributeMap;
     _attributeOrder = source->_attributeOrder;
 
-    for (ElementPtr child : source->getChildren())
+    for (const ConstElementPtr& child : source->getChildren())
     {
         const string& name = child->getName();
-        if (skipDuplicateElements && getChild(name))
+
+        // Check for duplicate elements.
+        ConstElementPtr previous = getChild(name);
+        if (previous && skipConflictingElements)
         {
             continue;
         }
-        ElementPtr childCopy = addChildOfCategory(child->getCategory(), name);
+
+        // Create the copied element.
+        ElementPtr childCopy = addChildOfCategory(child->getCategory(), name, !previous);
         childCopy->copyContentFrom(child);
+
+        // Check for conflicting elements.
+        if (previous && *previous != *childCopy)
+        {
+            throw Exception("Duplicate element with conflicting content: " + name);
+        }
     }
 }
 
@@ -421,10 +434,6 @@ bool Element::validate(string* message) const
 {
     bool res = true;
     validateRequire(isValidName(getName()), res, message, "Invalid element name");
-    if (hasColorSpace())
-    {
-        validateRequire(getDocument()->hasColorManagementSystem(), res, message, "Colorspace set without color management system");
-    }
     if (hasInheritString())
     {
         bool validInherit = getInheritsFrom() && getInheritsFrom()->getCategory() == getCategory();
@@ -581,6 +590,30 @@ bool ValueElement::validate(string* message) const
     if (hasType() && hasValueString())
     {
         validateRequire(getValue() != nullptr, res, message, "Invalid value");
+    }
+    if (hasInterfaceName())
+    {
+        validateRequire(isA<Parameter>() || isA<Input>(), res, message, "Only parameter and input elements support interface names");
+        ConstNodeGraphPtr nodeGraph = getAncestorOfType<NodeGraph>();
+        NodeDefPtr nodeDef = nodeGraph ? nodeGraph->getNodeDef() : nullptr;
+        if (nodeDef)
+        {
+            ValueElementPtr valueElem = nodeDef->getActiveValueElement(getInterfaceName());
+            validateRequire(valueElem != nullptr, res, message, "Interface name not found in referenced NodeDef");
+            if (valueElem)
+            {
+                ConstPortElementPtr portElem = asA<PortElement>();
+                if (portElem && portElem->hasChannels())
+                {
+                    bool valid = portElem->validChannelsString(portElem->getChannels(), valueElem->getType(), getType());
+                    validateRequire(valid, res, message, "Invalid channels string for interface name");
+                }
+                else
+                {
+                    validateRequire(getType() == valueElem->getType(), res, message, "Interface name refers to value element of a different type");
+                }
+            }
+        }
     }
     return TypedElement::validate(message) && res;
 }

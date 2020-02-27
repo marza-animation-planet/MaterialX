@@ -54,7 +54,7 @@ using StringResolverPtr = shared_ptr<StringResolver>;
 using ElementMap = std::unordered_map<string, ElementPtr>;
 
 /// A standard function taking an ElementPtr and returning a boolean.
-using ElementPredicate = std::function<bool(ElementPtr)>;
+using ElementPredicate = std::function<bool(ConstElementPtr)>;
 
 /// @class Element
 /// The base class for MaterialX elements.
@@ -423,7 +423,7 @@ class Element : public std::enable_shared_from_this<Element>
     ///     If no name is specified, then a unique name will automatically be
     ///     generated.
     /// @throws Exception if a child of this element already possesses the
-    ///    given name.
+    ///     given name.
     /// @return A shared pointer to the new child element.
     template<class T> shared_ptr<T> addChild(const string& name = EMPTY_STRING);
 
@@ -434,11 +434,14 @@ class Element : public std::enable_shared_from_this<Element>
     /// @param name The name of the new child element.
     ///     If no name is specified, then a unique name will automatically be
     ///     generated.
+    /// @param registerChild If true, then the child will be registered as
+    ///     belonging to this element tree.  Defaults to true.
     /// @throws Exception if a child of this element already possesses the
-    ///    given name.
+    ///     given name.
     /// @return A shared pointer to the new child element.
     ElementPtr addChildOfCategory(const string& category,
-                                  const string& name = EMPTY_STRING);
+                                  string name = EMPTY_STRING,
+                                  bool registerChild = true);
 
     /// Return the child element, if any, with the given name.
     ElementPtr getChild(const string& name) const
@@ -466,9 +469,9 @@ class Element : public std::enable_shared_from_this<Element>
         return _childOrder;
     }
 
-    /// Return a vector of all child elements that are instances of the given type,
-    /// optionally filtered by the given category string.  The returned vector
-    /// maintains the order in which children were added.
+    /// Return a vector of all child elements that are instances of the given
+    /// subclass, optionally filtered by the given category string.  The returned
+    /// vector maintains the order in which children were added.
     template<class T> vector< shared_ptr<T> > getChildrenOfType(const string& category = EMPTY_STRING) const
     {
         vector< shared_ptr<T> > children;
@@ -604,6 +607,21 @@ class Element : public std::enable_shared_from_this<Element>
     ConstDocumentPtr getDocument() const
     {
         return getRoot()->asA<Document>();
+    }
+
+    /// Return the first ancestor of the given subclass, or an empty shared
+    /// pointer if no ancestor of this subclass is found.
+    template<class T> shared_ptr<const T> getAncestorOfType() const
+    {
+        for (ConstElementPtr elem = getSelf(); elem; elem = elem->getParent())
+        {
+            shared_ptr<const T> typedElem = elem->asA<T>();
+            if (typedElem)
+            {
+                return typedElem;
+            }
+        }
+        return nullptr;
     }
 
     /// @}
@@ -756,7 +774,7 @@ class Element : public std::enable_shared_from_this<Element>
     /// @param copyOptions An optional pointer to a CopyOptions object.
     ///    If provided, then the given options will affect the behavior of the
     ///    copy function.  Defaults to a null pointer.
-    void copyContentFrom(ConstElementPtr source, const CopyOptions* copyOptions = nullptr);
+    void copyContentFrom(const ConstElementPtr& source, const CopyOptions* copyOptions = nullptr);
 
     /// Clear all attributes and descendants from this element.
     void clearContent();
@@ -1092,7 +1110,6 @@ class ValueElement : public TypedElement
 
   public:
     static const string VALUE_ATTRIBUTE;
-    static const string PUBLIC_NAME_ATTRIBUTE;
     static const string INTERFACE_NAME_ATTRIBUTE;
     static const string IMPLEMENTATION_NAME_ATTRIBUTE;
     static const string IMPLEMENTATION_TYPE_ATTRIBUTE;
@@ -1102,6 +1119,7 @@ class ValueElement : public TypedElement
     static const string UI_FOLDER_ATTRIBUTE;
     static const string UI_MIN_ATTRIBUTE;
     static const string UI_MAX_ATTRIBUTE;
+    static const string UI_ADVANCED_ATTRIBUTE;
 };
 
 /// @class Token
@@ -1271,14 +1289,14 @@ class CopyOptions
 {
   public:
     CopyOptions() :
-        skipDuplicateElements(false)
+        skipConflictingElements(false)
     {
     }
     ~CopyOptions() { }
 
-    /// If true, elements at the same scope with duplicate names will be skipped;
-    /// otherwise, they will trigger an exception.  Defaults to false.
-    bool skipDuplicateElements;
+    /// If true, duplicate elements with non-identical content will be skipped;
+    /// otherwise they will trigger an exception.  Defaults to false.
+    bool skipConflictingElements;
 };
 
 /// @class ExceptionOrphanedElement

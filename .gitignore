@@ -3,3 +3,4 @@ excons.cache
 .sconsign.dblite
 release/
 debug/
+build

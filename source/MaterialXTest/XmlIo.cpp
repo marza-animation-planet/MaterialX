@@ -13,55 +13,30 @@ namespace mx = MaterialX;
 
 TEST_CASE("Load content", "[xmlio]")
 {
-    std::string libraryFilenames[] =
-    {
-        "stdlib_defs.mtlx",
-        "stdlib_ng.mtlx",
-        "stdlib_osl_impl.mtlx"
-    };
-    std::string exampleFilenames[] =
-    {
-        "CustomNode.mtlx",
-        "Looks.mtlx",
-        "MaterialBasic.mtlx",
-        "MultiOutput.mtlx",
-        "NodeGraphs.mtlx",
-        "PaintMaterials.mtlx",
-        "PostShaderComposite.mtlx",
-        "PreShaderComposite.mtlx",
-        "BxDF/alSurface.mtlx",
-        "BxDF/Disney_BRDF_2012.mtlx",
-        "BxDF/Disney_BSDF_2015.mtlx",
-    };
-
-    std::string searchPath = "documents/Libraries/stdlib" + 
-                             mx::PATH_LIST_SEPARATOR + 
-                             "documents/Libraries/stdlib/osl" + 
-                             mx::PATH_LIST_SEPARATOR + 
-                             "documents/Examples";
+    mx::FilePath libraryPath("libraries/stdlib");
+    mx::FilePath examplesPath("resources/Materials/Examples/Syntax");
+    std::string searchPath = libraryPath.asString() +
+                             mx::PATH_LIST_SEPARATOR +
+                             examplesPath.asString();
 
     // Read the standard library.
     std::vector<mx::DocumentPtr> libs;
-    for (std::string filename : libraryFilenames)
+    for (std::string filename : libraryPath.getFilesInDirectory(mx::MTLX_EXTENSION))
     {
         mx::DocumentPtr lib = mx::createDocument();
         mx::readFromXmlFile(lib, filename, searchPath);
-        std::string message;
-        bool docValid = lib->validate(&message);
-        if (!docValid)
-        {
-            WARN("[" + filename + "] " + message);
-        }
-        REQUIRE(docValid);
         libs.push_back(lib);
     }
 
     // Read and validate each example document.
-    bool firstExample = true;
-    for (std::string filename : exampleFilenames)
+    for (std::string filename : examplesPath.getFilesInDirectory(mx::MTLX_EXTENSION))
     {
         mx::DocumentPtr doc = mx::createDocument();
         mx::readFromXmlFile(doc, filename, searchPath);
+        for (mx::DocumentPtr lib : libs)
+        {
+            doc->importLibrary(lib);
+        }
         std::string message;
         bool docValid = doc->validate(&message);
         if (!docValid)
@@ -116,17 +91,10 @@ TEST_CASE("Load content", "[xmlio]")
         mx::readFromXmlString(writtenDoc, xmlString);
         REQUIRE(*writtenDoc == *doc);
 
-        // Combine document with the standard library.
-        for (mx::DocumentPtr lib : libs)
-        {
-            doc->importLibrary(lib);
-        }
-        REQUIRE(doc->validate());
-
         // Flatten subgraph references.
         for (mx::NodeGraphPtr nodeGraph : doc->getNodeGraphs())
         {
-            if (!firstExample && nodeGraph->getActiveSourceUri() != doc->getSourceUri())
+            if (nodeGraph->getActiveSourceUri() != doc->getSourceUri())
             {
                 continue;
             }
@@ -134,12 +102,11 @@ TEST_CASE("Load content", "[xmlio]")
             REQUIRE(nodeGraph->validate());
         }
 
-        // Verify that all referenced types and nodes are declared, and that
-        // referenced node declarations are implemented.
+        // Verify that all referenced types and nodes are declared.
         bool referencesValid = true;
         for (mx::ElementPtr elem : doc->traverseTree())
         {
-            if (!firstExample && elem->getActiveSourceUri() != doc->getSourceUri())
+            if (elem->getActiveSourceUri() != doc->getSourceUri())
             {
                 continue;
             }
@@ -153,7 +120,6 @@ TEST_CASE("Load content", "[xmlio]")
                     referencesValid = false;
                 }
             }
-
             mx::NodePtr node = elem->asA<mx::Node>();
             if (node)
             {
@@ -162,26 +128,43 @@ TEST_CASE("Load content", "[xmlio]")
                     WARN("[" + node->getActiveSourceUri() + "] Node " + node->getName() + " has no matching NodeDef");
                     referencesValid = false;
                 }
-                if (!node->getImplementation())
-                {
-                    WARN("[" + node->getActiveSourceUri() + "] Node " + node->getName() + " has no matching Implementation");
-                    referencesValid = false;
-                }
             }
         }
         REQUIRE(referencesValid);
-
-        firstExample = false;
     }
 
-    // Read the same document twice with duplicate elements skipped.
+    // Read the same document twice and verify that duplicate elements
+    // are skipped.
     mx::DocumentPtr doc = mx::createDocument();
-    mx::XmlReadOptions readOptions;
-    readOptions.skipDuplicateElements = true;
     std::string filename = "PostShaderComposite.mtlx";
-    mx::readFromXmlFile(doc, filename, searchPath, &readOptions);
-    mx::readFromXmlFile(doc, filename, searchPath, &readOptions);
+    mx::readFromXmlFile(doc, filename, searchPath);
+    mx::readFromXmlFile(doc, filename, searchPath);
     REQUIRE(doc->validate());
+
+    // Import libraries twice and verify that duplicate elements are
+    // skipped.
+    mx::DocumentPtr libDoc = doc->copy();
+    for (mx::DocumentPtr lib : libs)
+    {
+        libDoc->importLibrary(lib);
+        libDoc->importLibrary(lib);
+    }
+    REQUIRE(libDoc->validate());
+
+    // Read document with conflicting elements.
+    mx::DocumentPtr conflictDoc = doc->copy();
+    for (mx::ElementPtr elem : conflictDoc->traverseTree())
+    {
+        if (elem->isA<mx::Node>("image"))
+        {
+            elem->setFilePrefix("differentFolder/");
+        }
+    }
+    REQUIRE_THROWS_AS(mx::readFromXmlFile(conflictDoc, filename, searchPath), mx::Exception&);
+    mx::XmlReadOptions readOptions;
+    readOptions.skipConflictingElements = true;
+    mx::readFromXmlFile(conflictDoc, filename, searchPath, &readOptions);
+    REQUIRE(conflictDoc->validate());
 
     // Read document without XIncludes.
     mx::DocumentPtr flatDoc = mx::createDocument();
@@ -199,7 +182,7 @@ TEST_CASE("Load content", "[xmlio]")
     REQUIRE_THROWS_AS(mx::readFromXmlFile(envDoc, filename), mx::ExceptionFileMissing&);
 
     // Serialize to XML with a custom predicate that skips images.
-    auto skipImages = [](mx::ElementPtr elem)
+    auto skipImages = [](mx::ConstElementPtr elem)
     {
         return !elem->isA<mx::Node>("image");
     };
@@ -225,4 +208,10 @@ TEST_CASE("Load content", "[xmlio]")
     // Read a non-existent document.
     mx::DocumentPtr nonExistentDoc = mx::createDocument();
     REQUIRE_THROWS_AS(mx::readFromXmlFile(nonExistentDoc, "NonExistent.mtlx"), mx::ExceptionFileMissing&);
+
+    // Read in include file without specifying search to the parent document
+    mx::DocumentPtr parentDoc = mx::createDocument();
+    mx::readFromXmlFile(parentDoc,
+        "resources/Materials/TestSuite/libraries/metal/brass_wire_mesh.mtlx", searchPath);
+    REQUIRE(nullptr != parentDoc->getNodeDef("ND_TestMetal"));
 }

@@ -1,5 +1,26 @@
 # Change Log
 
+## [1.36.3] - 2019-08-02
+
+Merged shader code generation and physically-based shading nodes from Autodesk's ShaderX extensions.  Added a default MaterialX viewer based on GLSL shader generation.
+
+### Added
+- Added the MaterialXGenShader library, supporting shader code generation in GLSL and OSL.
+- Added the MaterialXRender library, providing helper functionality for rendering MaterialX content.
+- Added the MaterialXView library, providing a default MaterialX viewer.
+- Added the physically-based shading node library (libraries/pbrlib).
+- Added a root-level 'cmake' folder, including a standard FindMaterialX module.
+- Added a root-level 'resources' folder, including example materials and meshes.
+- Added documents for the 1.37 specification.
+
+### Changed
+- Moved the MaterialX data libraries from 'documents/Libraries' to 'libraries'.
+- Updated MaterialX node definitions to the 1.37 specification.
+- Updated the PyBind11 library to version 2.2.4.
+
+### Removed
+- Removed customizations of PyBind11 to support Python 2.6.  Only Python versions 2.7 and 3.x are now supported.
+
 ## [1.36.2] - 2019-03-05
 
 ### Added
@@ -25,8 +46,8 @@
 - Replaced readXIncludes boolean with a readXIncludeFunction callback in the XmlReadOptions structure.
 - Combined individual options into an XmlWriteOptions argument for the XML write functions.
 - Extended functionality of the vector and matrix classes.
-- Updated PyBind11 library to version 2.2.3.
-- Updated PugiXML library to version 1.9.
+- Updated the PyBind11 library to version 2.2.3.
+- Updated the PugiXML library to version 1.9.
 
 ### Fixed
 - Fixed graph implementations of range, extract, tiledimage, and ramp4 nodes.
@@ -68,7 +89,7 @@ Updated the MaterialX library to the v1.36 specification.
 ### Changed
 - Renamed Matrix3x3 to Matrix33 and Matrix4x4 to Matrix44.
 - Renamed VectorN\:\:length to VectorN\:\:numElements.
-- Updated Python bindings to PyBind11 2.2.1.
+- Updated the PyBind11 library to version 2.2.1.
 
 ## [1.35.4] - 2017-12-18
 

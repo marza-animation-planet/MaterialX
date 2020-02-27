@@ -21,23 +21,20 @@ using namespace pugi;
 namespace MaterialX
 {
 
+const string MTLX_EXTENSION = "mtlx";
+
 namespace {
 
-const string SOURCE_URI_ATTRIBUTE = "__sourceUri";
 const string XINCLUDE_TAG = "xi:include";
 
 void elementFromXml(const xml_node& xmlNode, ElementPtr elem, const XmlReadOptions* readOptions)
 {
-    bool skipDuplicateElements = readOptions && readOptions->skipDuplicateElements;
+    bool skipConflictingElements = readOptions && readOptions->skipConflictingElements;
 
     // Store attributes in element.
     for (const xml_attribute& xmlAttr : xmlNode.attributes())
     {
-        if (xmlAttr.name() == SOURCE_URI_ATTRIBUTE)
-        {
-            elem->setSourceUri(xmlAttr.value());
-        }
-        else if (xmlAttr.name() != Element::NAME_ATTRIBUTE)
+        if (xmlAttr.name() != Element::NAME_ATTRIBUTE)
         {
             elem->setAttribute(xmlAttr.name(), xmlAttr.value());
         }
@@ -57,14 +54,22 @@ void elementFromXml(const xml_node& xmlNode, ElementPtr elem, const XmlReadOptio
             }
         }
 
-        // If requested, skip elements with duplicate names.
-        if (skipDuplicateElements && elem->getChild(name))
+        // Check for duplicate elements.
+        ConstElementPtr previous = elem->getChild(name);
+        if (previous && skipConflictingElements)
         {
             continue;
         }
 
-        ElementPtr child = elem->addChildOfCategory(category, name);
+        // Create the new element.
+        ElementPtr child = elem->addChildOfCategory(category, name, !previous);
         elementFromXml(xmlChild, child, readOptions);
+
+        // Check for conflicting elements.
+        if (previous && *previous != *child)
+        {
+            throw Exception("Duplicate element with conflicting content: " + name);
+        }
     }
 }
 
@@ -86,7 +91,7 @@ void elementToXml(ConstElementPtr elem, xml_node& xmlNode, const XmlWriteOptions
 
     // Create child nodes and recurse.
     StringSet writtenSourceFiles;
-    for (ElementPtr child : elem->getChildren())
+    for (const ConstElementPtr& child : elem->getChildren())
     {
         if (elementPredicate && !elementPredicate(child))
         {
@@ -143,6 +148,9 @@ void xmlDocumentFromFile(xml_document& xmlDoc, string filename, const string& se
 
 void processXIncludes(DocumentPtr doc, xml_node& xmlNode, const string& searchPath, const XmlReadOptions* readOptions)
 {
+    // Search path for includes. Set empty and then evaluated once in the iteration through xml includes.
+    string includeSearchPath;
+
     XmlReadFunction readXIncludeFunction = readOptions ? readOptions->readXIncludeFunction : readFromXmlFile;
     xml_node xmlChild = xmlNode.first_child();
     while (xmlChild)
@@ -155,16 +163,43 @@ void processXIncludes(DocumentPtr doc, xml_node& xmlNode, const string& searchPa
                 string filename = xmlChild.attribute("href").value();
 
                 // Check for XInclude cycles.
-                if (readOptions && readOptions->parentFilenames.count(filename))
+                if (readOptions)
                 {
-                    throw ExceptionParseError("XInclude cycle detected.");
+                    const StringVec& parents = readOptions->parentXIncludes;
+                    if (std::find(parents.begin(), parents.end(), filename) != parents.end())
+                    {
+                        throw ExceptionParseError("XInclude cycle detected.");
+                    }
                 }
 
                 // Read the included file into a library document.
                 DocumentPtr library = createDocument();
                 XmlReadOptions xiReadOptions = readOptions ? *readOptions : XmlReadOptions();
-                xiReadOptions.parentFilenames.insert(filename);
-                readXIncludeFunction(library, filename, searchPath, &xiReadOptions);
+                xiReadOptions.parentXIncludes.push_back(filename);
+
+                // Prepend the directory of the parent to accomodate
+                // includes relative the the parent file location.
+                if (includeSearchPath.empty())
+                {
+                    string parentUri = doc->getSourceUri();
+                    if (!parentUri.empty())
+                    {
+                        FileSearchPath fileSearchPath(searchPath);
+                        FilePath filePath = fileSearchPath.find(parentUri);
+                        if (!filePath.isEmpty())
+                        {
+                            // Remove the file name from the path as we want the path to the containing folder.
+                            filePath.pop();
+                            includeSearchPath = filePath.asString() + PATH_LIST_SEPARATOR + searchPath;
+                        }
+                    }
+                    // Set default search path if no parent path found
+                    if (includeSearchPath.empty())
+                    {
+                        includeSearchPath = searchPath;
+                    }
+                }
+                readXIncludeFunction(library, filename, includeSearchPath, &xiReadOptions);
 
                 // Import the library document.
                 doc->importLibrary(library, readOptions);
@@ -253,8 +288,17 @@ void readFromXmlFile(DocumentPtr doc, const string& filename, const string& sear
     xml_document xmlDoc;
     xmlDocumentFromFile(xmlDoc, filename, searchPath);
 
+    // This must be done before parsing the XML as the source URI
+    // is used for searching for include files.
+    if (readOptions && !readOptions->parentXIncludes.empty())
+    {
+        doc->setSourceUri(readOptions->parentXIncludes[0]);
+    }
+    else
+    {
+        doc->setSourceUri(filename);
+    }
     documentFromXml(doc, xmlDoc, searchPath, readOptions);
-    doc->setSourceUri(filename);
 }
 
 void readFromXmlString(DocumentPtr doc, const string& str, const XmlReadOptions* readOptions)
