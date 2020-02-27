@@ -31,8 +31,10 @@ defs.append("MATERIALX_BUILD_VERSION=%d" % patch)
 
 if sys.platform == "win32":
     cppflags += " /W4 /MP /bigobj"
-else:
+elif sys.platform == "darwin":
     cppflags += " -std=gnu++11 -Wall -Wno-ignored-qualifiers -Wno-unused-parameter -Wno-undefined-var-template -Wno-missing-braces"
+else:
+    cppflags += " -std=gnu++11 -Wall -Wno-ignored-qualifiers -Wno-unused-parameter -Wno-missing-field-initializers -Wno-missing-braces"
 
 
 prjs = []
