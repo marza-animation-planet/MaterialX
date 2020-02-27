@@ -3,7 +3,7 @@ language: cpp
 addons:
   apt:
     sources:
-      - llvm-toolchain-trusty-7
+      - llvm-toolchain-xenial-8
       - ubuntu-toolchain-r-test
     packages:
       - libglu1-mesa-dev
@@ -14,41 +14,49 @@ addons:
       - libxi-dev
       - libx11-dev
       - g++-6
-      - g++-8
-      - clang-7
+      - g++-9
+      - clang-8
 
 matrix:
   include:
     # Standard builds
     - os: linux
+      dist: xenial
       compiler: gcc
     - os: linux
+      dist: xenial
       compiler: clang
     - os: osx
+      osx_image: xcode11
       compiler: gcc
     - os: osx
+      osx_image: xcode11
       compiler: clang
 
     # Custom builds
     - os: linux
+      dist: xenial
       compiler: gcc
       env: MATRIX_EVAL="CC=gcc-6 && CXX=g++-6"
     - os: linux
+      dist: xenial
       compiler: gcc
-      env: MATRIX_EVAL="CC=gcc-8 && CXX=g++-8 && CMAKE_EXTRA_ARGS='-DMATERIALX_PYTHON_LTO=OFF'"
+      env: MATRIX_EVAL="CC=gcc-9 && CXX=g++-9 && PY=3"
     - os: linux
+      dist: xenial
       compiler: clang
-      env: MATRIX_EVAL="CC=clang-7 && CXX=clang++-7"
+      env: MATRIX_EVAL="CC=clang-8 && CXX=clang++-8 && PY=3"
 
 before_install:
+  - export PY=2
   - eval "${MATRIX_EVAL}"
 
 script:
   - mkdir build
   - cd build
-  - cmake -DMATERIALX_BUILD_PYTHON=ON -DMATERIALX_BUILD_VIEWER=ON -DMATERIALX_PYTHON_VERSION=2 -DMATERIALX_INSTALL_PYTHON=OFF -DMATERIALX_WARNINGS_AS_ERRORS=ON ${CMAKE_EXTRA_ARGS} ..
-  - cmake --build . --target install -- -j4
+  - cmake -DMATERIALX_BUILD_PYTHON=ON -DMATERIALX_BUILD_VIEWER=ON -DMATERIALX_PYTHON_VERSION=$PY -DMATERIALX_INSTALL_PYTHON=OFF -DMATERIALX_WARNINGS_AS_ERRORS=ON ..
+  - cmake --build . --target install -- -j2
   - ctest -VV --output-on-failure
   - export PYTHONPATH=$PYTHONPATH:$PWD/installed/python
-  - cmake -E chdir ../python/MaterialXTest python main.py
-  - cmake -E chdir ../python/MaterialXTest python genshader.py
+  - cmake -E chdir ../python/MaterialXTest python$PY main.py
+  - cmake -E chdir ../python/MaterialXTest python$PY genshader.py

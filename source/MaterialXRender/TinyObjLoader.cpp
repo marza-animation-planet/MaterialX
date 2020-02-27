@@ -7,25 +7,29 @@
 #include <MaterialXCore/Util.h>
 
 #if defined(__GNUC__) && !defined(__clang__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
 #endif
+
 #define TINYOBJLOADER_IMPLEMENTATION
+
 #include <MaterialXRender/External/TinyObjLoader/tiny_obj_loader.h>
+
 #if defined(__GNUC__) && !defined(__clang__)
-#pragma GCC diagnostic pop
+    #pragma GCC diagnostic pop
 #endif
 
 #include <iostream>
 
 namespace MaterialX
 {
+
 bool TinyObjLoader::load(const FilePath& filePath, MeshList& meshList)
 {
     tinyobj::attrib_t attrib;
-    std::vector<tinyobj::shape_t> shapes;
-    std::vector<tinyobj::material_t> materials;
-    std::string err;
+    vector<tinyobj::shape_t> shapes;
+    vector<tinyobj::material_t> materials;
+    string err;
     bool load = tinyobj::LoadObj(&attrib, &shapes, &materials, nullptr, &err,
                                  filePath.asString().c_str(), nullptr, true, false);
     if (!load)
@@ -79,9 +83,9 @@ bool TinyObjLoader::load(const FilePath& filePath, MeshList& meshList)
     Vector3 boxMin = { MAX_FLOAT, MAX_FLOAT, MAX_FLOAT };
     Vector3 boxMax = { -MAX_FLOAT, -MAX_FLOAT, -MAX_FLOAT };
 
-    int writeIndex0 = 0;
-    int writeIndex1 = 1;
-    int writeIndex2 = 2;
+    uint32_t writeIndex0 = 0;
+    uint32_t writeIndex1 = 1;
+    uint32_t writeIndex2 = 2;
 
     const size_t FACE_VERTEX_COUNT = 3;
     for (const tinyobj::shape_t& shape : shapes)

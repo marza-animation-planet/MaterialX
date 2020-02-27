@@ -42,13 +42,11 @@ class Exception : public std::exception
 {
   public:
     explicit Exception(const string& msg) :
-        std::exception(),
         _msg(msg)
     {
     }
 
     Exception(const Exception& e) :
-        std::exception(),
         _msg(e._msg)
     {
     }
@@ -59,11 +57,11 @@ class Exception : public std::exception
         return *this;
     }
 
-    virtual ~Exception() throw()
+    virtual ~Exception() noexcept
     {
     }
 
-    const char* what() const throw() override
+    const char* what() const noexcept override
     {
         return _msg.c_str();
     }

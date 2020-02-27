@@ -434,6 +434,30 @@ void ShaderGeneratorTester::addColorManagement()
     }
 }
 
+void ShaderGeneratorTester::addUnitSystem()
+{
+    if (!_unitSystem && _shaderGenerator)
+    {
+        const std::string language = _shaderGenerator->getLanguage();
+        _unitSystem = mx::UnitSystem::create(language);
+        if (!_unitSystem)
+        {
+            _logFile << ">> Failed to create unit system for language: " << language << std::endl;
+        }
+        else
+        {
+            _shaderGenerator->setUnitSystem(_unitSystem);
+            _unitSystem->loadLibrary(_dependLib);
+            _unitSystem->setUnitConverterRegistry(mx::UnitConverterRegistry::create());
+            mx::UnitTypeDefPtr distanceTypeDef = _dependLib->getUnitTypeDef("distance");
+            _unitSystem->getUnitConverterRegistry()->addUnitConverter(distanceTypeDef, mx::LinearUnitConverter::create(distanceTypeDef));
+            _defaultDistanceUnit = "meter";            
+            mx::UnitTypeDefPtr angleTypeDef = _dependLib->getUnitTypeDef("angle");
+            _unitSystem->getUnitConverterRegistry()->addUnitConverter(angleTypeDef, mx::LinearUnitConverter::create(angleTypeDef));
+        }
+    }
+}
+
 void ShaderGeneratorTester::setupDependentLibraries()
 {
     _dependLib = mx::createDocument();
@@ -459,9 +483,9 @@ void ShaderGeneratorTester::addSkipNodeDefs()
 {
 }
 
-void ShaderGeneratorTester::mapNodeDefToIdentiers(const std::vector<mx::NodePtr>& nodes,
-                                                  std::unordered_map<std::string, unsigned int>& ids)
+LightIdMap ShaderGeneratorTester::computeLightIdMap(const std::vector<mx::NodePtr>& nodes)
 {
+    std::unordered_map<std::string, unsigned int> idMap;
     unsigned int id = 1;
     for (const auto& node : nodes)
     {
@@ -469,12 +493,13 @@ void ShaderGeneratorTester::mapNodeDefToIdentiers(const std::vector<mx::NodePtr>
         if (nodedef)
         {
             const std::string& name = nodedef->getName();
-            if (!ids.count(name))
+            if (!idMap.count(name))
             {
-                ids[name] = id++;
+                idMap[name] = id++;
             }
         }
     }
+    return idMap;
 }
 
 void ShaderGeneratorTester::findLights(mx::DocumentPtr doc, std::vector<mx::NodePtr>& lights)
@@ -501,7 +526,7 @@ void ShaderGeneratorTester::registerLights(mx::DocumentPtr doc, const std::vecto
     if (!lights.empty())
     {
         // Create a list of unique nodedefs and ids for them
-        mapNodeDefToIdentiers(lights, _lightIdentifierMap);
+        _lightIdentifierMap = computeLightIdMap(lights);
         for (const auto& id : _lightIdentifierMap)
         {
             mx::NodeDefPtr nodeDef = doc->getNodeDef(id.first);
@@ -546,6 +571,7 @@ void ShaderGeneratorTester::validate(const mx::GenOptions& generateOptions, cons
     // Dependent library setup
     setupDependentLibraries();
     addColorManagement();
+    addUnitSystem();
 
     // Test suite setup
     addSkipFiles();
@@ -579,6 +605,12 @@ void ShaderGeneratorTester::validate(const mx::GenOptions& generateOptions, cons
     mx::GenContext context(_shaderGenerator);
     context.getOptions() = generateOptions;
     context.registerSourceCodeSearchPath(_srcSearchPath);
+
+    // Define working unit if required
+    if (context.getOptions().targetDistanceUnit.empty())
+    {
+        context.getOptions().targetDistanceUnit = _defaultDistanceUnit;
+    }
 
     size_t documentIndex = 0;
     mx::CopyOptions copyOptions;

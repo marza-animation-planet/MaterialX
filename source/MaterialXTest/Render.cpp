@@ -4,41 +4,57 @@
 //
 
 #include <MaterialXTest/Catch/catch.hpp>
-#include <MaterialXTest/GenShaderUtil.h>
-
-#include <MaterialXCore/Document.h>
-
-#include <MaterialXFormat/XmlIo.h>
-
-#include <MaterialXGenShader/Util.h>
-#include <MaterialXGenShader/HwShaderGenerator.h>
-#include <MaterialXGenShader/DefaultColorManagementSystem.h>
-
-#include <MaterialXRender/Util.h>
-#include <MaterialXRender/ExceptionShaderValidationError.h>
 
 #include <MaterialXTest/RenderUtil.h>
 
-#ifdef MATERIALX_BUILD_CONTRIB
-#include <MaterialXContrib/Handlers/TinyEXRImageLoader.h>
-#endif
+#include <MaterialXRender/ShaderRenderer.h>
+#include <MaterialXRender/StbImageLoader.h>
+#include <MaterialXRender/TinyObjLoader.h>
+#include <MaterialXRender/Types.h>
+
 #ifdef MATERIALX_BUILD_OIIO
 #include <MaterialXRender/OiioImageLoader.h>
 #endif
-#include <MaterialXRender/StbImageLoader.h>
-
-#include <MaterialXRender/GeometryHandler.h>
-#include <MaterialXRender/TinyObjLoader.h>
+#ifdef MATERIALX_BUILD_CONTRIB
+#include <MaterialXContrib/Handlers/TinyEXRImageLoader.h>
+#endif
 
 #include <fstream>
 #include <iostream>
+#include <limits>
 #include <unordered_set>
-#include <chrono>
-#include <ctime>
 
 namespace mx = MaterialX;
 
-#define LOG_TO_FILE
+TEST_CASE("Render: Half Float", "[rendercore]")
+{
+    const std::vector<float> values =
+    {
+        0.0f, 0.25f, 0.5f, 0.75f,
+        1.0f, 8.0f, 64.0f, 512.0f,
+        std::numeric_limits<float>::infinity()
+    };
+    const std::vector<float> signs = { 1.0f, -1.0f };
+
+    for (float value : values)
+    {
+        for (float sign : signs)
+        {
+            float f(value * sign);
+            mx::Half h(f);
+            REQUIRE(h == f);
+            REQUIRE(h + mx::Half(1.0f) == f + 1.0f);
+            REQUIRE(h - mx::Half(1.0f) == f - 1.0f);
+            REQUIRE(h * mx::Half(2.0f) == f * 2.0f);
+            REQUIRE(h / mx::Half(2.0f) == f / 2.0f);
+            REQUIRE((h += mx::Half(3.0f)) == (f += 3.0f));
+            REQUIRE((h -= mx::Half(3.0f)) == (f -= 3.0f));
+            REQUIRE((h *= mx::Half(4.0f)) == (f *= 4.0f));
+            REQUIRE((h /= mx::Half(4.0f)) == (f /= 4.0f));
+            REQUIRE(-h == -f);
+        }
+    }
+}
 
 struct GeomHandlerTestOptions
 {
@@ -65,7 +81,6 @@ void testGeomHandler(GeomHandlerTestOptions& options)
         for (const mx::FilePath& file : files)
         {
             const mx::FilePath filePath = imagePath / file;
-            mx::ImageDesc desc;
             bool loaded = options.geomHandler->loadGeometry(filePath);
             if (options.logFile)
             {
@@ -100,7 +115,7 @@ TEST_CASE("Render: Geometry Handler Load", "[rendercore]")
 
         geomLoaded = true;
     }
-    catch (mx::ExceptionShaderValidationError& e)
+    catch (mx::ExceptionShaderRenderError& e)
     {
         for (const auto& error : e.errorLog())
         {
@@ -140,15 +155,15 @@ void testImageHandler(ImageHandlerTestOptions& options)
         for (const mx::FilePath& file : files)
         {
             const mx::FilePath filePath = imagePath / file;
-            mx::ImageDesc desc;
-            bool loaded = options.imageHandler->acquireImage(filePath, desc, false);
-            desc.freeResourceBuffer();
-            CHECK(!desc.resourceBuffer);
+            mx::ImagePtr image = options.imageHandler->acquireImage(filePath, false);
+            CHECK(image);
+            image->releaseResourceBuffer();
+            CHECK(!image->getResourceBuffer());
             if (options.logFile)
             {
-                *(options.logFile) << "Loaded image: " << filePath.asString() << ". Loaded: " << loaded << std::endl;
+                *(options.logFile) << "Loaded image: " << filePath.asString() << ". Loaded: " << (bool) image << std::endl;
             }
-            if (!loaded)
+            if (!image)
             {
                 loadFailed++;
             }
@@ -164,20 +179,14 @@ TEST_CASE("Render: Image Handler Load", "[rendercore]")
     bool imagesLoaded = false;
     try
     {
-        // Create a stock color image
-        mx::ImageHandlerPtr imageHandler = mx::ImageHandler::create(nullptr);
         mx::Color4 color(1.0f, 0.0f, 0.0f, 1.0f);
-        mx::ImageDesc desc;
-        bool createdColorImage = imageHandler->createColorImage(color, desc);
-        CHECK(!createdColorImage);
-        desc.width = 1;
-        desc.height = 1;
-        desc.channelCount = 3;
-        createdColorImage = imageHandler->createColorImage(color, desc);
-        CHECK(createdColorImage);
-        desc.freeResourceBuffer();
-        CHECK(!desc.resourceBuffer);
+        mx::ImagePtr uniformImage = mx::Image::createConstantColor(1, 1, color);
+        CHECK(uniformImage->getWidth() == 1);
+        CHECK(uniformImage->getHeight() == 1);
+        CHECK(uniformImage->getMaxMipCount() == 1);
+        CHECK(uniformImage->getTexelColor(0, 0) == color);
 
+        mx::ImageHandlerPtr imageHandler = mx::ImageHandler::create(nullptr);
         ImageHandlerTestOptions options;
         options.logFile = &imageHandlerLog;
 
@@ -201,7 +210,7 @@ TEST_CASE("Render: Image Handler Load", "[rendercore]")
 #endif
         imagesLoaded = true;
     }
-    catch (mx::ExceptionShaderValidationError& e)
+    catch (mx::ExceptionShaderRenderError& e)
     {
         for (const auto& error : e.errorLog())
         {

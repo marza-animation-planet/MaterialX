@@ -9,8 +9,9 @@
 
 #include <MaterialXGenGlsl/GlslShaderGenerator.h>
 #include <MaterialXGenShader/HwShaderGenerator.h>
+#include <MaterialXGenShader/UnitSystem.h>
+#include <MaterialXRender/ImageHandler.h>
 #include <MaterialXRender/LightHandler.h>
-#include <MaterialXRenderGlsl/GLTextureHandler.h>
 
 #include <nanogui/common.h>
 #include <nanogui/glutil.h>
@@ -109,12 +110,6 @@ class Material
                                    mx::DocumentPtr stdLib,
                                    const mx::FilePath& imagePath);
 
-    /// Generate an ambient occlusion shader
-    bool generateAmbOccShader(mx::GenContext& context,
-                              const mx::FilePath& filename,
-                              mx::DocumentPtr stdLib,
-                              const mx::FilePath& imagePath);
-
     /// Return the underlying OpenGL shader.
     GLShaderPtr getShader() const
     {
@@ -126,7 +121,7 @@ class Material
     {
         return _hasTransparency;
     }
-    
+
     /// Bind shader
     void bindShader();
 
@@ -134,20 +129,23 @@ class Material
     void bindViewInformation(const mx::Matrix44& world, const mx::Matrix44& view, const mx::Matrix44& proj);
 
     /// Bind all images for this material.
-    void bindImages(mx::GLTextureHandlerPtr imageHandler,
-                    const mx::FileSearchPath& searchPath,
-                    const std::string& udim);
+    void bindImages(mx::ImageHandlerPtr imageHandler, const mx::FileSearchPath& searchPath);
 
     /// Unbbind all images for this material.
-    void unbindImages(mx::GLTextureHandlerPtr imageHandler);
+    void unbindImages(mx::ImageHandlerPtr imageHandler);
 
     /// Bind a single image.
-    mx::FilePath bindImage(const mx::FilePath& filename, const std::string& uniformName, mx::GLTextureHandlerPtr imageHandler,
-                           mx::ImageDesc& desc, const mx::ImageSamplingProperties& samplingProperties, const std::string& udim = mx::EMPTY_STRING, mx::Color4* fallbackColor = nullptr);
+    mx::ImagePtr bindImage(const mx::FilePath& filePath, const std::string& uniformName, mx::ImageHandlerPtr imageHandler,
+                           const mx::ImageSamplingProperties& samplingProperties, const mx::Color4* fallbackColor = nullptr);
 
     /// Bind lights to shader.
-    void bindLights(mx::LightHandlerPtr lightHandler, mx::GLTextureHandlerPtr imageHandler, const mx::FileSearchPath& imagePath, 
-                    bool directLighting, bool indirectLighting, mx::HwSpecularEnvironmentMethod specularEnvironmentMethod, int envSamples);
+    void bindLights(mx::LightHandlerPtr lightHandler, mx::ImageHandlerPtr imageHandler,
+                    bool directLighting, bool indirectLighting,
+                    mx::ImagePtr ambientOcclusionMap, float ambientOcclusionGain,
+                    mx::HwSpecularEnvironmentMethod specularEnvironmentMethod, int envSamples);
+
+    /// Bind units.
+    void bindUnits(mx::UnitConverterRegistryPtr& registry, const mx::GenContext& context);
 
     /// Bind the given mesh to this material.
     void bindMesh(mx::MeshPtr mesh) const;
@@ -164,6 +162,27 @@ class Material
     /// Find a public uniform from its MaterialX path.
     mx::ShaderPort* findUniform(const std::string& path) const;
 
+    /// Change the uniform value inside the shader and the associated element in the MaterialX document.
+    void changeUniformElement(mx::ShaderPort* uniform, const std::string& value);
+
+    /// Set the value for an integer element with a given path.
+    void setUniformInt(const std::string& path, int value);
+
+    /// Set the value for a float element with a given path.
+    void setUniformFloat(const std::string& path, float value);
+
+    /// Set the value for a vector2 element with a given path.
+    void setUniformVec2(const std::string& path, const ng::Vector2f& value);
+
+    /// Set the value for a vector3 element with a given path.
+    void setUniformVec3(const std::string& path, const ng::Vector3f& value);
+
+    /// Set the value for a vector4 element with a given path.
+    void setUniformVec4(const std::string& path, const ng::Vector4f& value);
+
+    /// Set the value for an enumerated element with a given path.
+    void setUniformEnum(const std::string& path, int index, const std::string& value);
+
   protected:
     void bindUniform(const std::string& name, mx::ConstValuePtr value);
     void updateUniformsList();
@@ -179,7 +198,7 @@ class Material
     bool _hasTransparency;
     mx::StringSet _uniformVariable;
 
-    std::vector<mx::FilePath> _boundImages;
+    std::vector<mx::ImagePtr> _boundImages;
 };
 
 #endif // MATERIALXVIEW_MATERIAL_H

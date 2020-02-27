@@ -9,6 +9,7 @@
 
 namespace MaterialX
 {
+
 const string MeshStream::POSITION_ATTRIBUTE("position");
 const string MeshStream::NORMAL_ATTRIBUTE("normal");
 const string MeshStream::TEXCOORD_ATTRIBUTE("texcoord");
@@ -61,12 +62,12 @@ bool Mesh::generateTangents(MeshStreamPtr positionStream, MeshStreamPtr texcoord
 
         // Based on Eric Lengyel at http://www.terathon.com/code/tangent.html
 
-        const MeshIndexBuffer& indicies = part->getIndices();
+        const MeshIndexBuffer& indices = part->getIndices();
         for (size_t faceIndex = 0; faceIndex < part->getFaceCount(); faceIndex++)
         {
-            int i1 = indicies[faceIndex * MeshStream::STRIDE_3D + 0];
-            int i2 = indicies[faceIndex * MeshStream::STRIDE_3D + 1];
-            int i3 = indicies[faceIndex * MeshStream::STRIDE_3D + 2];
+            uint32_t i1 = indices[faceIndex * MeshStream::STRIDE_3D + 0];
+            uint32_t i2 = indices[faceIndex * MeshStream::STRIDE_3D + 1];
+            uint32_t i3 = indices[faceIndex * MeshStream::STRIDE_3D + 2];
 
             Vector3& v1 = *reinterpret_cast<Vector3*>(&(positions[i1 * positionStride]));
             Vector3& v2 = *reinterpret_cast<Vector3*>(&(positions[i2 * positionStride]));
@@ -171,7 +172,7 @@ void Mesh::splitByUdims()
 
     using UdimMap = std::map<uint32_t, MeshPartitionPtr>;
     UdimMap udimMap;
-    const unsigned int FACE_VERTEX_COUNT = 3;
+    const size_t FACE_VERTEX_COUNT = 3;
     for (size_t p = 0; p < getPartitionCount(); p++)
     {
         MeshPartitionPtr part = getPartition(p);
@@ -210,37 +211,37 @@ void MeshStream::transform(const Matrix44 &matrix)
 {
     unsigned int stride = getStride();
     size_t numElements = _data.size() / getStride();
-    if(getType() == MeshStream::POSITION_ATTRIBUTE ||
-       getType() == MeshStream::TEXCOORD_ATTRIBUTE ||
-       getType() == MeshStream::GEOMETRY_PROPERTY_ATTRIBUTE)
+    if (getType() == MeshStream::POSITION_ATTRIBUTE ||
+        getType() == MeshStream::TEXCOORD_ATTRIBUTE ||
+        getType() == MeshStream::GEOMETRY_PROPERTY_ATTRIBUTE)
     {
         for (size_t i=0; i<numElements; i++)
         {
             Vector4 vec(0.0, 0.0, 0.0, 1.0);
-            for(size_t j=0; j<stride; j++)
+            for (size_t j=0; j<stride; j++)
             {
                 vec[j] = _data[i*stride + j];
             }
             vec = matrix.multiply(vec);
-            for(size_t k=0; k<stride; k++)
+            for (size_t k=0; k<stride; k++)
             {
                 _data[i*stride + k] = vec[k];
             }
         }
     }
-    else if(getType() == MeshStream::NORMAL_ATTRIBUTE ||
-            getType() == MeshStream::TANGENT_ATTRIBUTE ||
-            getType() == MeshStream::BITANGENT_ATTRIBUTE)
+    else if (getType() == MeshStream::NORMAL_ATTRIBUTE ||
+             getType() == MeshStream::TANGENT_ATTRIBUTE ||
+             getType() == MeshStream::BITANGENT_ATTRIBUTE)
     {
         for (size_t i=0; i<numElements; i++)
         {
             Vector3 vec(0.0, 0.0, 0.0);
-            for(size_t j=0; j<stride; j++)
+            for (size_t j=0; j<stride; j++)
             {
                 vec[j] = _data[i*stride + j];
             }
             vec = matrix.transformNormal(vec);
-            for(size_t k=0; k<stride; k++)
+            for (size_t k=0; k<stride; k++)
             {
                 _data[i*stride + k] = vec[k];
             }

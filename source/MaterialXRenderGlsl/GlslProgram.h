@@ -9,13 +9,12 @@
 /// @file
 /// GLSL Program interfaces
 
-#include <MaterialXGenShader/Shader.h>
-
-#include <MaterialXRender/ExceptionShaderValidationError.h>
-#include <MaterialXRender/ViewHandler.h>
-#include <MaterialXRender/ImageHandler.h>
 #include <MaterialXRender/GeometryHandler.h>
+#include <MaterialXRender/ImageHandler.h>
 #include <MaterialXRender/LightHandler.h>
+#include <MaterialXRender/ViewHandler.h>
+
+#include <MaterialXGenShader/Shader.h>
 
 namespace MaterialX
 {
@@ -23,7 +22,7 @@ namespace MaterialX
 // Shared pointer to a GlslProgram
 using GlslProgramPtr = std::shared_ptr<class GlslProgram>;
 
-/// @class @GlslProgram
+/// @class GlslProgram
 /// GLSL program helper class to perform validation of GLSL source code.
 ///
 /// There are two main interfaces which can be used. One which takes in a HwShader and one which
@@ -47,7 +46,7 @@ class GlslProgram
 
     /// Set up code stages to validate based on an input hardware shader.
     /// @param shader Hardware shader to use
-    void setStages(const ShaderPtr shader);
+    void setStages(ShaderPtr shader);
 
     /// Set the code stages based on a list of stage strings.
     /// Refer to the ordering of stages as defined by a HwShader.
@@ -72,7 +71,7 @@ class GlslProgram
     /// @return Program identifier.
     unsigned int build();
 
-    /// Structure to hold information about program inputs
+    /// Structure to hold information about program inputs.
     /// The structure is populated by directly scanning the program so may not contain
     /// some inputs listed on any associated HwShader as those inputs may have been
     /// optimized out if they are unused.
@@ -95,6 +94,8 @@ class GlslProgram
         bool isConstant;
         /// Element path (if any)
         string path;
+        /// Unit
+        string unit;
 
         /// Program input constructor
         Input(int inputLocation, int inputType, int inputSize, string inputPath)
@@ -174,9 +175,6 @@ class GlslProgram
     /// Bind any input textures
     void bindTextures(ImageHandlerPtr imageHandler);
 
-    /// Unbind input textures
-    void unbindTextures(ImageHandlerPtr imageHandler);
-
     /// Bind lighting
     void bindLighting(LightHandlerPtr lightHandler, ImageHandlerPtr imageHandler);
 
@@ -230,12 +228,11 @@ class GlslProgram
     /// @{
 
     /// Bind an individual texture to a program uniform location
-    bool bindTexture(unsigned int uniformType, int uniformLocation, const FilePath& filePath,
-                     ImageHandlerPtr imageHandler, bool generateMipMaps, const ImageSamplingProperties& imageProperties,
-                     ImageDesc& desc);
+    ImagePtr bindTexture(unsigned int uniformType, int uniformLocation, const FilePath& filePath,
+                         ImageHandlerPtr imageHandler, bool generateMipMaps, const ImageSamplingProperties& imageProperties);
 
     /// Utility to check for OpenGL context errors.
-    /// Will throw an ExceptionShaderValidationError exception which will list of the errors found
+    /// Will throw an ExceptionShaderRenderError exception which will list of the errors found
     /// if any errors encountered.
     void checkErrors();
 

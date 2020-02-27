@@ -6,6 +6,7 @@
 #include <MaterialXRender/GeometryHandler.h>
 #include <MaterialXRender/LightHandler.h>
 #include <MaterialXGenGlsl/GlslShaderGenerator.h>
+#include <MaterialXGenShader/UnitConverter.h>
 
 namespace mx = MaterialX;
 namespace ng = nanogui;
@@ -13,14 +14,13 @@ namespace ng = nanogui;
 class Viewer : public ng::Screen
 {
   public:
-    Viewer(const mx::StringVec& libraryFolders,
-           const mx::FileSearchPath& searchPath,
+    Viewer(const std::string& materialFilename,
            const std::string& meshFilename,
-           const std::string& materialFilename,
+           const mx::FilePathVec& libraryFolders,
+           const mx::FileSearchPath& searchPath,
            const DocumentModifiers& modifiers,
            mx::HwSpecularEnvironmentMethod specularEnvironmentMethod,
            const std::string& envRadiancePath,
-           const std::string& envIrradiancePath,
            int multiSampleCount);
     ~Viewer() { }
 
@@ -71,7 +71,7 @@ class Viewer : public ng::Screen
         return _searchPath;
     }
 
-    const mx::GLTextureHandlerPtr getImageHandler() const
+    mx::ImageHandlerPtr getImageHandler() const
     {
         return _imageHandler;
     }
@@ -85,9 +85,11 @@ class Viewer : public ng::Screen
     void drawScene3D();
     void drawScene2D();
 
-    void setupLights(mx::DocumentPtr doc);
+    void loadEnvironmentLight();
+    void applyDirectLights(mx::DocumentPtr doc);
     void loadDocument(const mx::FilePath& filename, mx::DocumentPtr libraries);
     void reloadShaders();
+    void loadStandardLibraries();
     void saveShaderSource();
     void loadShaderSource();
     void saveDotFiles();
@@ -103,10 +105,13 @@ class Viewer : public ng::Screen
     void updateGeometrySelections();
     void updateMaterialSelections();
     void updateMaterialSelectionUI();
-    void updatePropertyEditor();
+    void updateDisplayedProperties();
 
     void createLoadMeshInterface(Widget* parent, const std::string& label);
     void createLoadMaterialsInterface(Widget* parent, const std::string& label);
+    void createLoadEnvironmentInterface(Widget* parent, const std::string& label);
+    void createSaveMaterialsInterface(Widget* parent, const std::string& label);
+    void createPropertyEditorInterface(Widget* parent, const std::string& label);
     void createAdvancedSettings(Widget* parent);
 
     mx::MeshStreamPtr createUvPositionStream(mx::MeshPtr mesh, 
@@ -114,6 +119,9 @@ class Viewer : public ng::Screen
                                             unsigned int index,
                                             const std::string& positionStreamName);
 
+    /// Return the ambient occlusion image, if any, associated with the given material.
+    mx::ImagePtr getAmbientOcclusionImage(MaterialPtr material);
+    
   private:
     ng::Window* _window;
     ng::Arcball _arcball;
@@ -134,26 +142,27 @@ class Viewer : public ng::Screen
     ng::Vector2i _translationStart;
 
     // Document management
-    mx::StringVec _libraryFolders;
+    mx::FilePathVec _libraryFolders;
     mx::FileSearchPath _searchPath;
     mx::DocumentPtr _stdLib;
     mx::FilePath _materialFilename;
     DocumentModifiers _modifiers;
+    mx::StringSet _xincludeFiles;
 
     // Lighting information
-    std::string _lightFileName;
-    std::string _envRadiancePath;
-    std::string _envIrradiancePath;
+    mx::FilePath _lightFilename;
+    mx::FilePath _envRadiancePath;
+    mx::DocumentPtr _lightDoc;
     bool _directLighting;
     bool _indirectLighting;
-    bool _ambientOcclusion;
+    float _ambientOcclusionGain;
 
     // Geometry selections
-    std::string _meshFilename;
+    mx::FilePath _meshFilename;
     std::vector<mx::MeshPartitionPtr> _geometryList;
     size_t _selectedGeom;
     ng::Label* _geomLabel;
-    ng::ComboBox* _geometryListBox;
+    ng::ComboBox* _geometrySelectionBox;
 
     // Material selections
     std::vector<MaterialPtr> _materials;
@@ -168,22 +177,30 @@ class Viewer : public ng::Screen
 
     // Resource handlers
     mx::GeometryHandlerPtr _geometryHandler;
-    mx::GLTextureHandlerPtr _imageHandler;
+    mx::ImageHandlerPtr _imageHandler;
     mx::LightHandlerPtr _lightHandler;
 
     // Supporting materials and geometry.
-    MaterialPtr _ambOccMaterial;
     mx::GeometryHandlerPtr _envGeometryHandler;
     MaterialPtr _envMaterial;
 
     // Shader generator
     mx::GenContext _genContext;
 
+    // Unit registry
+    mx::UnitConverterRegistryPtr _unitRegistry;
+
     // Mesh options
     bool _splitByUdims;
 
     // Material options
     bool _mergeMaterials;
+    bool _bakeTextures;
+
+    // Unit options
+    mx::StringVec _distanceUnitOptions;
+    ng::ComboBox* _distanceUnitBox;
+    mx::LinearUnitConverterPtr _distanceUnitConverter;
 
     // Render options
     bool _outlineSelection;

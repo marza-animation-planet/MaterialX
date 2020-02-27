@@ -3,29 +3,18 @@
 // All rights reserved.  See LICENSE.txt for license.
 //
 
-#include <MaterialXGenShader/Util.h>
 #include <MaterialXTest/RenderUtil.h>
 #include <MaterialXTest/Catch/catch.hpp>
+
+#include <MaterialXRender/Image.h>
+
+#include <MaterialXGenShader/UnitConverter.h>
+#include <MaterialXGenShader/Util.h>
 
 namespace mx = MaterialX;
 
 namespace RenderUtil
 {
-// Utility to create a light rig for hardware render testing
-void createLightRig(mx::DocumentPtr doc, mx::LightHandler& lightHandler, mx::GenContext& context,
-                    const mx::FilePath& envIrradiancePath, const mx::FilePath& envRadiancePath)
-{
-    // Scan for lights
-    std::vector<mx::NodePtr> lights;
-    lightHandler.findLights(doc, lights);
-    lightHandler.registerLights(doc, lights, context);
-
-    // Set the list of lights on the with the generator
-    lightHandler.setLightSources(lights);
-    // Set up IBL inputs
-    lightHandler.setLightEnvIrradiancePath(envIrradiancePath);
-    lightHandler.setLightEnvRadiancePath(envRadiancePath);
-}
 
 ShaderRenderTester::ShaderRenderTester(mx::ShaderGeneratorPtr shaderGenerator) :
     _shaderGenerator(shaderGenerator),
@@ -76,6 +65,30 @@ void ShaderRenderTester::printRunLog(const RenderProfileTimes &profileTimes,
     //    getImplementationWhiteList(whiteList);
     //    GenShaderUtil::checkImplementationUsage(language, usedImpls, whiteList, dependLib, context, stream);
     //}
+}
+
+void ShaderRenderTester::loadDependentLibraries(GenShaderUtil::TestSuiteOptions options, mx::FilePath searchPath, mx::DocumentPtr& dependLib)
+{
+    dependLib = mx::createDocument();
+
+    const mx::StringVec libraries = { "stdlib", "pbrlib", "lights" };
+    mx::loadLibraries(libraries, searchPath, dependLib, nullptr);
+    for (size_t i = 0; i < options.externalLibraryPaths.size(); i++)
+    {
+        const mx::FilePath& libraryPath = options.externalLibraryPaths[i];
+        for (const mx::FilePath& libraryFile : libraryPath.getFilesInDirectory("mtlx"))
+        {
+            std::cout << "Extra library path: " << (libraryPath / libraryFile).asString() << std::endl;
+            mx::loadLibrary((libraryPath / libraryFile), dependLib);
+        }
+    }
+
+    // Load shader definitions used in the test suite.
+    loadLibrary(mx::FilePath::getCurrentPath() / mx::FilePath("libraries/bxdf/standard_surface.mtlx"), dependLib);
+    loadLibrary(mx::FilePath::getCurrentPath() / mx::FilePath("libraries/bxdf/usd_preview_surface.mtlx"), dependLib);
+
+    // Load any addition per renderer libraries
+    loadAdditionalLibraries(dependLib, options);
 }
 
 bool ShaderRenderTester::validate(const mx::FilePathVec& testRootPaths, const mx::FilePath optionsFilePath)
@@ -143,50 +156,45 @@ bool ShaderRenderTester::validate(const mx::FilePathVec& testRootPaths, const mx
 
     ioTimer.endTimer();
 
+    // Add files to skip
+    addSkipFiles();
+
     // Library search path
     mx::FilePath searchPath = mx::FilePath::getCurrentPath() / mx::FilePath("libraries");
 
     // Load in the library dependencies once
     // This will be imported in each test document below
     ioTimer.startTimer();
-    mx::DocumentPtr dependLib = mx::createDocument();
-
-    // Add files to skip
-    addSkipFiles();
-
-    const mx::StringVec libraries = { "stdlib", "pbrlib", "lights" };
-    mx::loadLibraries(libraries, searchPath, dependLib, nullptr);
-    for (size_t i = 0; i < options.externalLibraryPaths.size(); i++)
-    {
-        const mx::FilePath& extraPath = options.externalLibraryPaths[i];
-        mx::FilePathVec libraryFiles = extraPath.getFilesInDirectory("mtlx");
-        for (size_t l = 0; l < libraryFiles.size(); l++)
-        {
-            std::cout << "Extra library path: " << (extraPath / libraryFiles[l]).asString() << std::endl;
-            mx::loadLibrary((extraPath / libraryFiles[l]), dependLib);
-        }
-    }
-
-    // Load shader definitions used in the test suite.
-    loadLibrary(mx::FilePath::getCurrentPath() / mx::FilePath("libraries/bxdf/standard_surface.mtlx"), dependLib);
-    loadLibrary(mx::FilePath::getCurrentPath() / mx::FilePath("libraries/bxdf/usd_preview_surface.mtlx"), dependLib);
-
-    // Load any addition per validator libraries
-    loadAdditionalLibraries(dependLib, options);
+    mx::DocumentPtr dependLib;
+    loadDependentLibraries(options, searchPath, dependLib);
     ioTimer.endTimer();
 
-    // Create validators and generators
+    // Create renderers and generators
     RenderUtil::AdditiveScopedTimer setupTime(profileTimes.languageTimes.setupTime, "Setup time");
 
-    createValidator(log);
+    createRenderer(log);
 
     mx::ColorManagementSystemPtr colorManagementSystem = mx::DefaultColorManagementSystem::create(_shaderGenerator->getLanguage());
     colorManagementSystem->loadLibrary(dependLib);
     _shaderGenerator->setColorManagementSystem(colorManagementSystem);
 
+    // Setup Unit system and working space
+    mx::UnitSystemPtr unitSystem = mx::UnitSystem::create(_shaderGenerator->getLanguage());
+    _shaderGenerator->setUnitSystem(unitSystem);
+    mx::UnitConverterRegistryPtr registry = mx::UnitConverterRegistry::create();
+    mx::UnitTypeDefPtr distanceTypeDef = dependLib->getUnitTypeDef("distance");
+    registry->addUnitConverter(distanceTypeDef, mx::LinearUnitConverter::create(distanceTypeDef));
+    mx::UnitTypeDefPtr angleTypeDef = dependLib->getUnitTypeDef("angle");
+    registry->addUnitConverter(angleTypeDef, mx::LinearUnitConverter::create(angleTypeDef));
+    _shaderGenerator->getUnitSystem()->loadLibrary(dependLib);
+    _shaderGenerator->getUnitSystem()->setUnitConverterRegistry(registry);
+
     mx::GenContext context(_shaderGenerator);
     context.registerSourceCodeSearchPath(searchPath);
     registerSourceCodeSearchPaths(context);
+
+    // Set target unit space
+    context.getOptions().targetDistanceUnit = "meter";
 
     setupTime.endTimer();
 
@@ -214,7 +222,6 @@ bool ShaderRenderTester::validate(const mx::FilePathVec& testRootPaths, const mx
 
         for (const std::string& file : files)
         {
-
             if (_skipFiles.count(file))
             {
                 continue;
@@ -229,35 +236,33 @@ bool ShaderRenderTester::validate(const mx::FilePathVec& testRootPaths, const mx
                 continue;
             }
 
-            const mx::FilePath filePath = mx::FilePath(dir) / mx::FilePath(file);
-            const std::string filename = filePath;
-
+            const mx::FilePath filename = mx::FilePath(dir) / mx::FilePath(file);
             mx::DocumentPtr doc = mx::createDocument();
             try
             {
-                mx::FileSearchPath readSearchPath(searchPath.asString());
+                mx::FileSearchPath readSearchPath(searchPath);
                 readSearchPath.append(dir);
-                mx::readFromXmlFile(doc, filename, readSearchPath.asString());
+                mx::readFromXmlFile(doc, filename, readSearchPath);
             }
             catch (mx::Exception& e)
             {
-                docValidLog << "Failed to load in file: " << filename << ". Error: " << e.what() << std::endl;
-                WARN("Failed to load in file: " + filename + "See: " + docValidLogFilename + " for details.");                    
+                docValidLog << "Failed to load in file: " << filename.asString() << ". Error: " << e.what() << std::endl;
+                WARN("Failed to load in file: " + filename.asString() + "See: " + docValidLogFilename + " for details.");
             }
 
             doc->importLibrary(dependLib, &copyOptions);
             ioTimer.endTimer();
 
             validateTimer.startTimer();
-            std::cout << "- Validating MTLX file: " << filename << std::endl;
-            log << "MTLX Filename: " << filename << std::endl;
+            std::cout << "- Validating MTLX file: " << filename.asString() << std::endl;
+            log << "MTLX Filename: " << filename.asString() << std::endl;
 
             // Validate the test document
             std::string validationErrors;
             bool validDoc = doc->validate(&validationErrors);
             if (!validDoc)
             {
-                docValidLog << filename << std::endl;
+                docValidLog << filename.asString() << std::endl;
                 docValidLog << validationErrors << std::endl;
             }
             validateTimer.endTimer();
@@ -307,7 +312,7 @@ bool ShaderRenderTester::validate(const mx::FilePathVec& testRootPaths, const mx
                                 mx::InterfaceElementPtr nodeGraphImpl = nodeGraph ? nodeGraph->getImplementation() : nullptr;
                                 usedImpls.insert(nodeGraphImpl ? nodeGraphImpl->getName() : impl->getName());
                             }
-                            runValidator(elementName, element, context, doc, log, options, profileTimes, imageSearchPath, outputPath);
+                            runRenderer(elementName, element, context, doc, log, options, profileTimes, imageSearchPath, outputPath);
                         }
                     }
                 }

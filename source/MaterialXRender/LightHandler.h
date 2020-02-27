@@ -9,34 +9,34 @@
 /// @file
 /// Handler for hardware lights
 
-#include <MaterialXCore/Definition.h>
-#include <MaterialXCore/Node.h>
+#include <MaterialXRender/Image.h>
 
-#include <string>
-#include <memory>
+#include <MaterialXCore/Document.h>
 
 namespace MaterialX
 {
+
 class GenContext;
 
 /// Shared pointer to a LightHandler
 using LightHandlerPtr = std::shared_ptr<class LightHandler>;
 
+/// An unordered map from light names to light indices.
+using LightIdMap = std::unordered_map<string, unsigned int>;
+
 /// @class LightHandler
 /// Utility light handler for creating and providing
 /// light data for shader binding.
-///
 class LightHandler
 {
   public:
-    /// Static instance create function
+    LightHandler()
+    {
+    }
+    virtual ~LightHandler() { }
+
+    /// Create a new light handler
     static LightHandlerPtr create() { return std::make_shared<LightHandler>(); }
-
-    /// Default constructor
-    LightHandler();
-
-    /// Default destructor
-    virtual ~LightHandler();
 
     /// Adds a light source node
     void addLightSource(NodePtr node);
@@ -59,51 +59,50 @@ class LightHandler
         _lightSources = lights;
     }
 
-    /// Set path to irradiance IBL image
-    void setLightEnvIrradiancePath(const FilePath& filePath)
+    /// Set the environment radiance map
+    void setEnvRadianceMap(ImagePtr map)
     {
-        _lightEnvIrradiancePath = filePath;
+        _envRadianceMap = map;
     }
 
-    /// Get path to irradiance IBL image
-    const FilePath& getLightEnvIrradiancePath() const
+    /// Return the environment radiance map
+    ImagePtr getEnvRadianceMap() const
     {
-        return _lightEnvIrradiancePath;
+        return _envRadianceMap;
     }
 
-    /// Set path to radiance IBL image
-    void setLightEnvRadiancePath(const FilePath& filePath)
+    /// Set the environment irradiance map
+    void setEnvIrradianceMap(ImagePtr map)
     {
-        _lightEnvRadiancePath = filePath;
+        _envIrradianceMap = map;
     }
 
-    /// Get path to radiance IBL image
-    const FilePath& getLightEnvRadiancePath() const
+    /// Return the environment irradiance map
+    ImagePtr getEnvIrradianceMap() const
     {
-        return _lightEnvRadiancePath;
+        return _envIrradianceMap;
     }
 
     /// From a set of nodes, create a mapping of corresponding
     /// nodedef identifiers to numbers
-    void mapNodeDefToIdentiers(const std::vector<NodePtr>& nodes,
-                               std::unordered_map<string, unsigned int>& ids);
+    LightIdMap computeLightIdMap(const vector<NodePtr>& nodes);
 
     /// Find lights to use based on an input document
     /// @param doc Document to scan for lights
     /// @param lights List of lights found in document
-    void findLights(DocumentPtr doc, std::vector<NodePtr>& lights);
+    void findLights(DocumentPtr doc, vector<NodePtr>& lights);
 
     /// Register light node definitions and light count with a given generation context
     /// @param doc Document containing light nodes and definitions
     /// @param lights Lights to register
     /// @param context Context to update
-    void registerLights(DocumentPtr doc, const std::vector<NodePtr>& lights, GenContext& context);
+    void registerLights(DocumentPtr doc, const vector<NodePtr>& lights, GenContext& context);
 
   private:
     vector<NodePtr> _lightSources;
     std::unordered_map<string, unsigned int> _lightIdentifierMap;
-    FilePath _lightEnvIrradiancePath;
-    FilePath _lightEnvRadiancePath;
+    ImagePtr _envRadianceMap;
+    ImagePtr _envIrradianceMap;
 };
 
 } // namespace MaterialX

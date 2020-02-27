@@ -1,5 +1,7 @@
 #include <MaterialXView/Material.h>
 
+#include <MaterialXRenderGlsl/GLTextureHandler.h>
+
 #include <MaterialXGenShader/HwShaderGenerator.h>
 #include <MaterialXGenShader/Shader.h>
 #include <MaterialXGenShader/Util.h>
@@ -14,6 +16,8 @@
 using MatrixXfProxy = Eigen::Map<const ng::MatrixXf>;
 using MatrixXuProxy = Eigen::Map<const ng::MatrixXu>;
 
+const mx::Color4 IMAGE_DEFAULT_COLOR(0, 0, 0, 1);
+
 //
 // Material methods
 //
@@ -24,50 +28,6 @@ bool Material::generateConstantShader(mx::GenContext& context,
                                       const mx::Color3& color)
 {
     _hwShader = createConstantShader(context, stdLib, shaderName, color);
-    if (!_hwShader)
-    {
-        return false;
-    }
-    std::string vertexShader = _hwShader->getSourceCode(mx::Stage::VERTEX);
-    std::string pixelShader = _hwShader->getSourceCode(mx::Stage::PIXEL);
-
-    // Compile and return.
-    _glShader = std::make_shared<ng::GLShader>();
-    return _glShader->init(shaderName, vertexShader, pixelShader);
-}
-
-bool Material::generateAmbOccShader(mx::GenContext& context,
-                                    const mx::FilePath& filename,
-                                    mx::DocumentPtr stdLib,
-                                    const mx::FilePath& imagePath)
-{
-    // Read in the ambient occlusion nodegraph. 
-    mx::DocumentPtr doc = mx::createDocument();
-    doc->importLibrary(stdLib);
-    mx::DocumentPtr envDoc = mx::createDocument();
-    mx::readFromXmlFile(envDoc, filename);
-    doc->importLibrary(envDoc);
-
-    mx::NodeGraphPtr nodeGraph = doc->getNodeGraph("NG_ambientOcclusion");
-    if (!nodeGraph)
-    {
-        return false;
-    }
-    mx::NodePtr image = nodeGraph->getNode("image_ao");
-    if (!image)
-    {
-        return false;
-    }
-    image->setParameterValue("file", imagePath.asString(), mx::FILENAME_TYPE_STRING);
-    mx::OutputPtr output = nodeGraph->getOutput("out");
-    if (!output)
-    {
-        return false;
-    }
-
-    // Create the shader.
-    std::string shaderName = "__AO_SHADER__";
-    _hwShader = createShader(shaderName, context, output); 
     if (!_hwShader)
     {
         return false;
@@ -185,10 +145,8 @@ bool Material::generateShader(mx::GenContext& context)
     {
         return false;
     }
-    if (!_hwShader)
-    {
-        _hwShader = createShader("Shader", context, _elem);
-    }
+
+    _hwShader = createShader("Shader", context, _elem);
     if (!_hwShader)
     {
         return false;
@@ -196,15 +154,14 @@ bool Material::generateShader(mx::GenContext& context)
 
     _hasTransparency = context.getOptions().hwTransparency;
 
-    if (!_glShader)
-    {
-        std::string vertexShader = _hwShader->getSourceCode(mx::Stage::VERTEX);
-        std::string pixelShader = _hwShader->getSourceCode(mx::Stage::PIXEL);
+    std::string vertexShader = _hwShader->getSourceCode(mx::Stage::VERTEX);
+    std::string pixelShader = _hwShader->getSourceCode(mx::Stage::PIXEL);
 
-        _glShader = std::make_shared<ng::GLShader>();
-        _glShader->init(_elem->getNamePath(), vertexShader, pixelShader);
-        updateUniformsList();
-    }
+    _glShader = std::make_shared<ng::GLShader>();
+    _glShader->init(_elem->getNamePath(), vertexShader, pixelShader);
+
+    updateUniformsList();
+
     return true;
 }
 
@@ -216,7 +173,7 @@ void Material::bindShader()
     }
 }
 
-void Material::bindMesh(const mx::MeshPtr mesh) const
+void Material::bindMesh(mx::MeshPtr mesh) const
 {
     if (!mesh || !_glShader)
     {
@@ -288,8 +245,14 @@ void Material::bindViewInformation(const mx::Matrix44& world, const mx::Matrix44
     mx::Matrix44 invTransWorld = world.getInverse().getTranspose();
 
     // Bind view properties.
-    _glShader->setUniform(mx::HW::WORLD_MATRIX, ng::Matrix4f(world.getTranspose().data()));
-    _glShader->setUniform(mx::HW::VIEW_PROJECTION_MATRIX, ng::Matrix4f(viewProj.getTranspose().data()));
+    if (_glShader->uniform(mx::HW::WORLD_MATRIX, false) != -1)
+    {
+        _glShader->setUniform(mx::HW::WORLD_MATRIX, ng::Matrix4f(world.getTranspose().data()));
+    }
+    if (_glShader->uniform(mx::HW::VIEW_PROJECTION_MATRIX, false) != -1)
+    {
+        _glShader->setUniform(mx::HW::VIEW_PROJECTION_MATRIX, ng::Matrix4f(viewProj.getTranspose().data()));
+    }
     if (_glShader->uniform(mx::HW::WORLD_INVERSE_TRANSPOSE_MATRIX, false) != -1)
     {
         _glShader->setUniform(mx::HW::WORLD_INVERSE_TRANSPOSE_MATRIX, ng::Matrix4f(invTransWorld.getTranspose().data()));
@@ -301,15 +264,15 @@ void Material::bindViewInformation(const mx::Matrix44& world, const mx::Matrix44
     }
 }
 
-void Material::unbindImages(mx::GLTextureHandlerPtr imageHandler)
+void Material::unbindImages(mx::ImageHandlerPtr imageHandler)
 {
-    for (const auto& filePath : _boundImages)
+    for (mx::ImagePtr image : _boundImages)
     {
-        imageHandler->unbindImage(filePath);
+        imageHandler->unbindImage(image);
     }
 }
 
-void Material::bindImages(mx::GLTextureHandlerPtr imageHandler, const mx::FileSearchPath& searchPath, const std::string& udim)
+void Material::bindImages(mx::ImageHandlerPtr imageHandler, const mx::FileSearchPath& searchPath)
 {
     if (!_glShader)
     {
@@ -319,10 +282,9 @@ void Material::bindImages(mx::GLTextureHandlerPtr imageHandler, const mx::FileSe
     _boundImages.clear();
 
     const mx::VariableBlock* publicUniforms = getPublicUniforms();
-    mx::Color4 fallbackColor(0, 0, 0, 1);
     for (const auto& uniform : publicUniforms->getVariableOrder())
     {
-        if (uniform->getType() != MaterialX::Type::FILENAME)
+        if (uniform->getType() != mx::Type::FILENAME)
         {
             continue;
         }
@@ -337,56 +299,54 @@ void Material::bindImages(mx::GLTextureHandlerPtr imageHandler, const mx::FileSe
         mx::ImageSamplingProperties samplingProperties;
         samplingProperties.setProperties(uniformVariable, *publicUniforms);
 
-        mx::ImageDesc desc;
-        mx::FilePath resolvedFilename = bindImage(filename, uniformVariable, imageHandler, desc, samplingProperties, udim, &fallbackColor);
-        if (!resolvedFilename.isEmpty())
+        mx::ImagePtr image = bindImage(filename, uniformVariable, imageHandler, samplingProperties, &IMAGE_DEFAULT_COLOR);
+        if (image)
         {
-            _boundImages.push_back(resolvedFilename);
+            _boundImages.push_back(image);
         }
     }
 }
 
-mx::FilePath Material::bindImage(const mx::FilePath& filePath, const std::string& uniformName, mx::GLTextureHandlerPtr imageHandler,
-                                 mx::ImageDesc& desc, const mx::ImageSamplingProperties& samplingProperties, const std::string& udim, mx::Color4* fallbackColor)
+mx::ImagePtr Material::bindImage(const mx::FilePath& filePath, const std::string& uniformName, mx::ImageHandlerPtr imageHandler,
+                                 const mx::ImageSamplingProperties& samplingProperties, const mx::Color4* fallbackColor)
 {
-    mx::FilePath returnPath;
-
     if (!_glShader)
     {
-        return returnPath;
+        return nullptr;
     }
 
-    // Apply udim string if specified.
-    mx::FilePath resolvedFilename = filePath;
-    if (!udim.empty())
+    // Create a filename resolver for geometric properties.
+    mx::StringResolverPtr resolver = mx::StringResolver::create();
+    if (!getUdim().empty())
     {
-        const mx::StringVec udimSet{ udim };
-        mx::FilePathVec udimPaths = mx::getUdimPaths(filePath, udimSet);
-        if (!udimPaths.empty())
-        {
-            resolvedFilename = udimPaths[0];
-        }
+        resolver->setUdimString(getUdim());
     }
+    imageHandler->setFilenameResolver(resolver);
 
     // Acquire the given image.
-    resolvedFilename = imageHandler->getSearchPath().find(resolvedFilename);
-    if (!imageHandler->acquireImage(resolvedFilename, desc, true, fallbackColor) && !filePath.isEmpty())
+    std::string error;
+    mx::ImagePtr image = imageHandler->acquireImage(filePath, true, fallbackColor, &error);
+    if (!error.empty())
     {
-        std::cerr << "Failed to load image: " << resolvedFilename.asString() << std::endl;
-        return returnPath;
+        std::cerr << error << std::endl;
+    }
+    if (!image)
+    {
+        return nullptr;
     }
 
     // Bind the image and set its sampling properties.
-    if (imageHandler->bindImage(resolvedFilename, samplingProperties))
+    if (imageHandler->bindImage(image, samplingProperties))
     {
-        int textureLocation = imageHandler->getBoundTextureLocation(desc.resourceId);
+        mx::GLTextureHandlerPtr textureHandler = std::static_pointer_cast<mx::GLTextureHandler>(imageHandler);
+        int textureLocation = textureHandler->getBoundTextureLocation(image->getResourceId());
         if (textureLocation >= 0)
         {
             _glShader->setUniform(uniformName, textureLocation, false);
-            return resolvedFilename;
+            return image;
         }
     }
-    return returnPath;
+    return nullptr;
 }
 
 void Material::bindUniform(const std::string& name, mx::ConstValuePtr value)
@@ -443,9 +403,10 @@ void Material::bindUniform(const std::string& name, mx::ConstValuePtr value)
     }
 }
 
-void Material::bindLights(mx::LightHandlerPtr lightHandler, mx::GLTextureHandlerPtr imageHandler,
-                          const mx::FileSearchPath& imagePath, bool directLighting,
-                          bool indirectLighting, mx::HwSpecularEnvironmentMethod specularEnvironmentMethod, int envSamples)
+void Material::bindLights(mx::LightHandlerPtr lightHandler, mx::ImageHandlerPtr imageHandler,
+                          bool directLighting, bool indirectLighting,
+                          mx::ImagePtr ambientOcclusionMap, float ambientOcclusionGain,
+                          mx::HwSpecularEnvironmentMethod specularEnvironmentMethod, int envSamples)
 {
     if (!_glShader)
     {
@@ -454,7 +415,7 @@ void Material::bindLights(mx::LightHandlerPtr lightHandler, mx::GLTextureHandler
 
     _glShader->bind();
 
-    // Bind environment light uniforms and images.
+    // Bind environment lighting properties.
     if (specularEnvironmentMethod == mx::SPECULAR_ENVIRONMENT_FIS)
     {
         if (_glShader->uniform(mx::HW::ENV_RADIANCE_SAMPLES, false) != -1)
@@ -462,35 +423,40 @@ void Material::bindLights(mx::LightHandlerPtr lightHandler, mx::GLTextureHandler
             _glShader->setUniform(mx::HW::ENV_RADIANCE_SAMPLES, envSamples);
         }
     }
-    mx::StringMap lightTextures = {
-        { mx::HW::ENV_RADIANCE, indirectLighting ? (std::string) lightHandler->getLightEnvRadiancePath() : mx::EMPTY_STRING },
-        { mx::HW::ENV_IRRADIANCE, indirectLighting ? (std::string) lightHandler->getLightEnvIrradiancePath() : mx::EMPTY_STRING }
-    };
-    const std::string udim;
-    mx::Color4 fallbackColor(0, 0, 0, 1);
-    for (const auto& pair : lightTextures)
+    mx::ImageMap envLights =
     {
-        if (_glShader->uniform(pair.first, false) != -1)
+        { mx::HW::ENV_RADIANCE, indirectLighting ? lightHandler->getEnvRadianceMap() : mx::ImagePtr() },
+        { mx::HW::ENV_IRRADIANCE, indirectLighting ? lightHandler->getEnvIrradianceMap() : mx::ImagePtr() }
+    };
+    for (const auto& env : envLights)
+    {
+        std::string uniform = env.first;
+        mx::ImagePtr image = env.second;
+        if (image && _glShader->uniform(env.first, false) != -1)
         {
-            mx::FilePath path = imagePath.find(pair.second);
-            const std::string filename = path.asString();
-
-            mx::ImageDesc desc;
             mx::ImageSamplingProperties samplingProperties;
             samplingProperties.uaddressMode = mx::ImageSamplingProperties::AddressMode::CLAMP;
             samplingProperties.vaddressMode = mx::ImageSamplingProperties::AddressMode::CLAMP;
-            samplingProperties.filterType = mx::ImageSamplingProperties::FilterType::CUBIC;
+            samplingProperties.filterType = mx::ImageSamplingProperties::FilterType::LINEAR;
 
-            if (!bindImage(filename, pair.first, imageHandler, desc, samplingProperties, udim, &fallbackColor).isEmpty())
+            // Bind the environment image.
+            if (imageHandler->bindImage(image, samplingProperties))
             {
+                mx::GLTextureHandlerPtr textureHandler = std::static_pointer_cast<mx::GLTextureHandler>(imageHandler);
+                int textureLocation = textureHandler->getBoundTextureLocation(image->getResourceId());
+                if (textureLocation >= 0)
+                {
+                    _glShader->setUniform(uniform, textureLocation, false);
+                }
+
+                // Bind any associated uniforms.
                 if (specularEnvironmentMethod == mx::SPECULAR_ENVIRONMENT_FIS)
                 {
-                    // Bind any associated uniforms.
-                    if (pair.first == mx::HW::ENV_RADIANCE)
+                    if (uniform == mx::HW::ENV_RADIANCE)
                     {
                         if (_glShader->uniform(mx::HW::ENV_RADIANCE_MIPS, false) != -1)
                         {
-                            _glShader->setUniform(mx::HW::ENV_RADIANCE_MIPS, desc.mipCount);
+                            _glShader->setUniform(mx::HW::ENV_RADIANCE_MIPS, image->getMaxMipCount());
                         }
                     }
                 }
@@ -498,65 +464,122 @@ void Material::bindLights(mx::LightHandlerPtr lightHandler, mx::GLTextureHandler
         }
     }
 
-    // Skip direct lights if unsupported by the shader.
-    if (_glShader->uniform(mx::HW::NUM_ACTIVE_LIGHT_SOURCES, false) == -1)
+    // Bind direct lighting properties.
+    if (_glShader->uniform(mx::HW::NUM_ACTIVE_LIGHT_SOURCES, false) != -1)
     {
-        return;
+        int lightCount = directLighting ? (int) lightHandler->getLightSources().size() : 0;
+        _glShader->setUniform(mx::HW::NUM_ACTIVE_LIGHT_SOURCES, lightCount);
+        mx::LightIdMap idMap = lightHandler->computeLightIdMap(lightHandler->getLightSources());
+        size_t index = 0;
+        for (mx::NodePtr light : lightHandler->getLightSources())
+        {
+            auto nodeDef = light->getNodeDef();
+            if (!nodeDef)
+            {
+                continue;
+            }
+
+            const std::string prefix = mx::HW::LIGHT_DATA_INSTANCE + "[" + std::to_string(index) + "]";
+
+            // Set light type id
+            std::string lightType(prefix + ".type");
+            if (_glShader->uniform(lightType, false) != -1)
+            {
+                unsigned int lightTypeValue = idMap[nodeDef->getName()];
+                _glShader->setUniform(lightType, lightTypeValue);
+            }
+
+            // Set all inputs
+            for (const auto& input : light->getInputs())
+            {
+                // Make sure we have a value to set
+                if (input->hasValue())
+                {
+                    std::string inputName(prefix + "." + input->getName());
+                    if (_glShader->uniform(inputName, false) != -1)
+                    {
+                        bindUniform(inputName, input->getValue());
+                    }
+                }
+            }
+
+            // Set all parameters. Note that upstream node connections are not currently supported.
+            for (mx::ParameterPtr param : light->getParameters())
+            {
+                // Make sure we have a value to set
+                if (param->hasValue())
+                {
+                    std::string paramName(prefix + "." + param->getName());
+                    if (_glShader->uniform(paramName, false) != -1)
+                    {
+                        bindUniform(paramName, param->getValue());
+                    }
+                }
+            }
+
+            ++index;
+        }
     }
 
-    // Bind direct light sources.
-    int lightCount = directLighting ? (int) lightHandler->getLightSources().size() : 0;
-    _glShader->setUniform(mx::HW::NUM_ACTIVE_LIGHT_SOURCES, lightCount);
-    std::unordered_map<std::string, unsigned int> ids;
-    lightHandler->mapNodeDefToIdentiers(lightHandler->getLightSources(), ids);
-    size_t index = 0;
-    for (mx::NodePtr light : lightHandler->getLightSources())
+    // Bind ambient occlusion properties.
+    if (ambientOcclusionMap && _glShader->uniform(mx::HW::AMB_OCC_MAP, false) != -1)
     {
-        auto nodeDef = light->getNodeDef();
-        if (!nodeDef)
-        {
-            continue;
-        }
+        mx::ImageSamplingProperties samplingProperties;
+        samplingProperties.uaddressMode = mx::ImageSamplingProperties::AddressMode::PERIODIC;
+        samplingProperties.vaddressMode = mx::ImageSamplingProperties::AddressMode::PERIODIC;
+        samplingProperties.filterType = mx::ImageSamplingProperties::FilterType::LINEAR;
 
-        const std::string prefix = mx::HW::LIGHT_DATA_INSTANCE + "[" + std::to_string(index) + "]";
-
-        // Set light type id
-        std::string lightType(prefix + ".type");
-        if (_glShader->uniform(lightType, false) != -1)
+        // Bind the ambient occlusion map.
+        if (imageHandler->bindImage(ambientOcclusionMap, samplingProperties))
         {
-            unsigned int lightTypeValue = ids[nodeDef->getName()];
-            _glShader->setUniform(lightType, lightTypeValue);
-        }
-
-        // Set all inputs
-        for (const auto& input : light->getInputs())
-        {
-            // Make sure we have a value to set
-            if (input->hasValue())
+            mx::GLTextureHandlerPtr textureHandler = std::static_pointer_cast<mx::GLTextureHandler>(imageHandler);
+            int textureLocation = textureHandler->getBoundTextureLocation(ambientOcclusionMap->getResourceId());
+            if (textureLocation >= 0)
             {
-                std::string inputName(prefix + "." + input->getName());
-                if (_glShader->uniform(inputName, false) != -1)
-                {
-                    bindUniform(inputName, input->getValue());
-                }
+                _glShader->setUniform(mx::HW::AMB_OCC_MAP, textureLocation, false);
             }
         }
+    }
+    if (_glShader->uniform(mx::HW::AMB_OCC_GAIN, false) != -1)
+    {
+        _glShader->setUniform(mx::HW::AMB_OCC_GAIN, ambientOcclusionGain);
+    }
+}
 
-        // Set all parameters. Note that upstream node connections are not currently supported.
-        for (mx::ParameterPtr param : light->getParameters())
+void Material::bindUnits(mx::UnitConverterRegistryPtr& registry, const mx::GenContext& context)
+{
+    static std::string DISTANCE_UNIT_TARGET_NAME = "u_distanceUnitTarget";
+
+    mx::ShaderPort* port = nullptr;
+    mx::VariableBlock* publicUniforms = getPublicUniforms();
+    if (publicUniforms)
+    {
+        // Scan block based on unit name match predicate
+        port = publicUniforms->find(
+            [](mx::ShaderPort* port)
         {
-            // Make sure we have a value to set
-            if (param->hasValue())
+            return (port && (port->getName() == DISTANCE_UNIT_TARGET_NAME));
+        });
+
+        // Check if the uniform exists in the shader program
+        if (port && !_uniformVariable.count(port->getVariable()))
+        {
+            port = nullptr;
+        }
+    }
+
+    if (port)
+    {
+        int intPortValue = registry->getUnitAsInteger(context.getOptions().targetDistanceUnit);
+        if (intPortValue >= 0)
+        {
+            port->setValue(mx::Value::createValue(intPortValue));
+            _glShader->bind();
+            if (_glShader->uniform(DISTANCE_UNIT_TARGET_NAME, false) != -1)
             {
-                std::string paramName(prefix + "." + param->getName());
-                if (_glShader->uniform(paramName, false) != -1)
-                {
-                    bindUniform(paramName, param->getValue());
-                }
+                _glShader->setUniform(DISTANCE_UNIT_TARGET_NAME, intPortValue);
             }
         }
-
-        ++index;
     }
 }
 
@@ -608,4 +631,98 @@ mx::ShaderPort* Material::findUniform(const std::string& path) const
         }
     }
     return port;
+}
+
+void Material::changeUniformElement(mx::ShaderPort* uniform, const std::string& value)
+{
+    if (!uniform)
+    {
+        throw std::runtime_error("Null ShaderPort");
+    }
+    uniform->setValue(mx::Value::createValueFromStrings(value, uniform->getType()->getName()));
+    mx::ElementPtr element = _doc->getDescendant(uniform->getPath());
+    if (element)
+    {
+        mx::ValueElementPtr valueElement = element->asA<mx::ValueElement>();
+        if (valueElement)
+        {
+            valueElement->setValueString(value);
+        }
+    }
+}
+
+void Material::setUniformInt(const std::string& path, int value)
+{
+    mx::ShaderPort* uniform = findUniform(path);
+    if (uniform)
+    {
+        getShader()->bind();
+        getShader()->setUniform(uniform->getVariable(), value);
+        std::stringstream intValue;
+        intValue << value;
+        changeUniformElement(uniform, intValue.str());
+    }
+}
+
+void Material::setUniformFloat(const std::string& path, float value)
+{
+    mx::ShaderPort* uniform = findUniform(path);
+    if (uniform)
+    {
+        getShader()->bind();
+        getShader()->setUniform(uniform->getVariable(), value);
+        std::stringstream floatValue;
+        floatValue << value;
+        changeUniformElement(uniform, floatValue.str());
+    }
+}
+
+void Material::setUniformVec2(const std::string& path, const ng::Vector2f& value)
+{
+    mx::ShaderPort* uniform = findUniform(path);
+    if (uniform)
+    {
+        getShader()->bind();
+        getShader()->setUniform(uniform->getVariable(), value);
+        std::stringstream vec2Value;
+        vec2Value << value[0] << mx::ARRAY_VALID_SEPARATORS << value[1];
+        changeUniformElement(uniform, vec2Value.str());
+    }
+}
+
+void Material::setUniformVec3(const std::string& path, const ng::Vector3f& value)
+{
+    mx::ShaderPort* uniform = findUniform(path);
+    if (uniform)
+    {        
+        getShader()->bind();
+        getShader()->setUniform(uniform->getVariable(), value);
+        std::stringstream vec3Value;
+        vec3Value << value[0] << mx::ARRAY_VALID_SEPARATORS << value[1] << mx::ARRAY_VALID_SEPARATORS << value[2];
+        changeUniformElement(uniform, vec3Value.str());
+    }    
+}
+
+void Material::setUniformVec4(const std::string& path, const ng::Vector4f& value)
+{
+    mx::ShaderPort* uniform = findUniform(path);
+    if (uniform)
+    {
+        getShader()->bind();
+        getShader()->setUniform(uniform->getVariable(), value);
+        std::stringstream vec4Value;        
+        vec4Value << value[0] << mx::ARRAY_VALID_SEPARATORS << value[1] << mx::ARRAY_VALID_SEPARATORS << value[2] << mx::ARRAY_VALID_SEPARATORS << value[3];
+        changeUniformElement(uniform, vec4Value.str());
+    }
+}
+
+void Material::setUniformEnum(const std::string& path, int index, const std::string& value)
+{
+    mx::ShaderPort* uniform = findUniform(path);
+    if (uniform)
+    {
+        getShader()->bind();
+        getShader()->setUniform(uniform->getVariable(), index);
+        changeUniformElement(uniform, value);
+    }
 }

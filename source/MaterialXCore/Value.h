@@ -12,9 +12,17 @@
 #include <MaterialXCore/Library.h>
 
 #include <MaterialXCore/Types.h>
+#include <MaterialXCore/Util.h>
 
 namespace MaterialX
 {
+
+/// A vector of integers.
+using IntVec = vector<int>;
+/// A vector of booleans.
+using BoolVec = vector<bool>;
+/// A vector of floats.
+using FloatVec = vector<float>;
 
 class Value;
 
@@ -49,6 +57,12 @@ class Value
         return std::make_shared< TypedValue<T> >(data);
     }
 
+    // Create a new value from a C-style string.
+    static ValuePtr createValue(const char* data)
+    {
+        return createValue(data ? string(data) : EMPTY_STRING);
+    }
+
     /// Create a new value instance from value and type strings.
     /// @return A shared pointer to a typed value, or an empty shared pointer
     ///    if the conversion to the given data type cannot be performed.
@@ -57,7 +71,6 @@ class Value
     /// Create a deep copy of the value.
     virtual ValuePtr copy() const = 0;
 
-    /// @}
     /// @name Data Accessors
     /// @{
 
@@ -178,7 +191,7 @@ template <class T> class TypedValue : public Value
 class ScopedFloatFormatting
 {
   public:
-    ScopedFloatFormatting(Value::FloatFormat format, int precision = 6);
+    explicit ScopedFloatFormatting(Value::FloatFormat format, int precision = 6);
     ~ScopedFloatFormatting();
 
   private:

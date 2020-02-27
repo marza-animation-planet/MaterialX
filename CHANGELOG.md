@@ -1,5 +1,38 @@
 # Change Log
 
+## [1.36.5] - 2020-01-11
+
+### Added
+- Added a Load Environment option to the viewer, allowing arbitrary latitude-longitude HDR environments to be loaded at run-time.
+- Added an initial TextureBaker class, supporting baking of procedural content to textures.
+- Added initial support for units, including the MaterialX\:\:Unit, MaterialX\:\:UnitDef, and MaterialX\:\:UnitTypeDef classes.
+- Added support for unit conversion in shader code generation.
+- Added support for Visual Studio 2019.
+
+### Changed
+- Updated Autodesk Standard Surface to the latest interface and graph.
+- Updated the PyBind11 library to version 2.4.3.
+
+## [1.36.4] - 2019-09-26
+
+### Added
+- Added a Save Material option to the viewer.
+- Added property accessors to PropertyAssign and PropertySetAssign
+- Added Python bindings for TypeDesc and array-type Values.
+- Added Python functions getTypeString, getValueString, and createValueFromStrings.
+- Added support for GCC 9 and Clang 8.
+
+### Changed
+- Updated the interface of readFromXmlFile and writeToXmlFile to support FilePath and FileSearchPath arguments.
+- Extended Python bindings for FilePath and FileSearchPath.
+
+### Removed
+- Deprecated Python functions typeToName, valueToString, and stringToValue.
+- Removed deprecated Python functions objectToString and stringToObject.
+
+### Fixed
+- Fixed the OSL implementation of roughness_dual.
+
 ## [1.36.3] - 2019-08-02
 
 Merged shader code generation and physically-based shading nodes from Autodesk's ShaderX extensions.  Added a default MaterialX viewer based on GLSL shader generation.

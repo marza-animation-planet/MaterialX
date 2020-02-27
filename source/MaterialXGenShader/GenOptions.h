@@ -51,8 +51,17 @@ enum HwSpecularEnvironmentMethod
 class GenOptions
 {
   public:
-    GenOptions();
-    virtual ~GenOptions();
+    GenOptions() :
+        shaderInterfaceType(SHADER_INTERFACE_COMPLETE),
+        fileTextureVerticalFlip(false),
+        hwTransparency(false),
+        hwSpecularEnvironmentMethod(SPECULAR_ENVIRONMENT_FIS),
+        hwAmbientOcclusion(false),
+        hwMaxActiveLightSources(3),
+        hwNormalizeUdimTexCoords(false)
+    {
+    }
+    virtual ~GenOptions() { }
 
     // TODO: Add options for:
     //  - shader gen optimization level
@@ -72,6 +81,11 @@ class GenOptions
     /// input values and textures into this color space.
     string targetColorSpaceOverride;
 
+    /// Define the target distance unit.
+    /// Shader fragments will be generated to transform
+    /// input distance values to the given unit.
+    string targetDistanceUnit;
+    
     /// Sets if transparency is needed or not for HW shaders.
     /// If a surface shader has potential of being transparent
     /// this must be set to true, otherwise no transparency
@@ -82,6 +96,10 @@ class GenOptions
     /// Sets the method to use for specular environment 
     /// lighting for HW shader targets.
     int hwSpecularEnvironmentMethod;
+
+    /// Enables ambient occlusion rendering for HW shader targets.
+    /// Defaults to false.
+    bool hwAmbientOcclusion;
 
     /// Sets the maximum number of light sources that can
     /// be active at once.
