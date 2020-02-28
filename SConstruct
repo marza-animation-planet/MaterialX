@@ -9,7 +9,7 @@ out_libdir = excons.OutputBaseDirectory() + "/lib"
 mtlx_opts = {}
 mtlx_opts["MATERIALX_BUILD_PYTHON"] = "1" if excons.GetArgument("materialx-bind-python", 1) != 0 else "0"
 mtlx_opts["MATERIALX_BUILD_VIEWER"] = "1" if excons.GetArgument("materialx-viewer", 1) != 0 else "0"
-mtlx_opts["PYBIND11_PTTHON_VERSION"] = excons.GetArgument("materialx-python-ver", "2.7", str)
+mtlx_opts["PYBIND11_PYTHON_VERSION"] = excons.GetArgument("materialx-python-ver", "2.7", str)
 mtlx_opts["MATERIALX_INSTALL_PYTHON"] = "0"
 
 
