@@ -4,3 +4,5 @@ excons.cache
 release/
 debug/
 build
+*.cmake.config
+*.cmake.outputs
