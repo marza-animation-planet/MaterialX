@@ -23,5 +23,13 @@ target_link_libraries(
            MaterialXGenShader
     PRIVATE ${CMAKE_DL_LIBS})
 
+if(UNIX)
+    if(APPLE)
+        set_target_properties(PyMaterialXGenShader PROPERTIES INSTALL_RPATH "@loader_path")
+    else()
+        set_target_properties(PyMaterialXGenShader PROPERTIES INSTALL_RPATH "$ORIGIN")
+    endif()
+endif()
+
 install(TARGETS PyMaterialXGenShader
         DESTINATION "${CMAKE_INSTALL_PREFIX}/python/MaterialX")
