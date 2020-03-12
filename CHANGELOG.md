@@ -1,5 +1,23 @@
 # Change Log
 
+## [1.37.0] - 2020-03-10
+
+Updated the MaterialX library to the v1.37 specification.  See the [v1.37 changelist](http://www.materialx.org/assets/MaterialX.v1.37REV2.Changelist.pdf) for full details.
+
+### Added
+- Added a Shadow Map option to the viewer, supported by shadowing functionality in GLSL code generation.
+- Added support for the 'uisoftmin', 'uisoftmax', and 'uistep' attributes, updating Autodesk Standard Surface to leverage these features.
+- Added support for LookGroup elements.
+- Added support for Clang 9.
+
+### Changed
+- Updated the set of standard nodes to match the v1.37 specification.
+- Unified the rules for NodeDef outputs, with all NodeDefs defining their output set through Output child elements rather than 'type' attributes.
+- Replaced GeomAttr elements with GeomProp elements.
+- Replaced backdrop nodes with Backdrop elements.
+- Aligned Matrix33 and Matrix44 with the row-vector convention, for improved consistency with Imath, USD, and other libraries.
+- Updated the stb_image library to version 2.23.
+
 ## [1.36.5] - 2020-01-11
 
 ### Added
@@ -87,7 +105,7 @@ Merged shader code generation and physically-based shading nodes from Autodesk's
 
 ## [1.36.0] - 2018-07-23
 
-Updated the MaterialX library to the v1.36 specification.
+Updated the MaterialX library to the v1.36 specification.  See the [v1.36 changelist](http://www.materialx.org/assets/MaterialX.v1.36.Changelist.pdf) for full details.
 
 ### Added
 - Added support for Element namespaces.
@@ -188,7 +206,7 @@ Updated the MaterialX library to the v1.36 specification.
 
 ## [1.35.0] - 2017-06-20
 
-Updated the MaterialX library to the v1.35 specification.
+Updated the MaterialX library to the v1.35 specification.  See the [v1.35 changelist](http://www.materialx.org/assets/MaterialX.v1.35.Changelist.pdf) for full details.
 
 ### Added
 - Added the MaterialX\:\:Visibility class.

@@ -75,12 +75,12 @@ void loadDocuments(const FilePath& rootPath, const FileSearchPath& searchPath, c
     }
 }
 
-void loadLibrary(const FilePath& file, DocumentPtr doc)
+void loadLibrary(const FilePath& file, DocumentPtr doc, const FileSearchPath* searchPath)
 {
     DocumentPtr libDoc = createDocument();
     XmlReadOptions readOptions;
     readOptions.skipConflictingElements = true;
-    readFromXmlFile(libDoc, file, FileSearchPath(), &readOptions);
+    readFromXmlFile(libDoc, file, searchPath ? *searchPath : FileSearchPath(), &readOptions);
     CopyOptions copyOptions;
     copyOptions.skipConflictingElements = true;
     doc->importLibrary(libDoc, &copyOptions);
@@ -102,7 +102,7 @@ StringVec loadLibraries(const StringVec& libraryNames,
                 if (!excludeFiles || !excludeFiles->count(filename))
                 {
                     const FilePath& file = path / filename;
-                    loadLibrary(file, doc);
+                    loadLibrary(file, doc, &searchPath);
                     loadedLibraries.push_back(file.asString());
                 }
             }
@@ -373,41 +373,58 @@ bool isTransparentSurface(ElementPtr element, const ShaderGenerator& shadergen)
         const string& nodetype = nodeDef->getNodeString();
         if (nodetype == "standard_surface")
         {
-            bool opaque = false;
+            bool opaque = true;
 
-            // First check the transmission weight
+            // Check transmission
             BindInputPtr transmission = shaderRef->getBindInput("transmission");
-            if (!transmission)
+            if (transmission)
             {
-                opaque = true;
-            }
-            else if (transmission->getOutputString() == EMPTY_STRING)
-            {
-                // Unconnected, check the value
-                ValuePtr value = transmission->getValue();
-                if (!value || isZero(value->asA<float>()))
+                if (transmission->getConnectedOutput())
                 {
-                    opaque = true;
+                    opaque = false;
                 }
-            }
-
-            // Second check the opacity
-            if (opaque)
-            {
-                opaque = false;
-
-                BindInputPtr opacity = shaderRef->getBindInput("opacity");
-                if (!opacity)
+                else
                 {
-                    opaque = true;
-                }
-                else if (opacity->getOutputString() == EMPTY_STRING)
-                {
-                    // Unconnected, check the value
-                    ValuePtr value = opacity->getValue();
-                    if (!value || (value->isA<Color3>() && isWhite(value->asA<Color3>())))
+                    ValuePtr value = transmission->getValue();
+                    if (value && value->isA<float>() && !isZero(value->asA<float>()))
                     {
-                        opaque = true;
+                        opaque = false;
+                    }
+                }
+            }
+
+            // Check opacity
+            BindInputPtr opacity = shaderRef->getBindInput("opacity");
+            if (opacity)
+            {
+                if (opacity->getConnectedOutput())
+                {
+                    opaque = false;
+                }
+                else
+                {
+                    ValuePtr value = opacity->getValue();
+                    if (value && value->isA<Color3>() && !isWhite(value->asA<Color3>()))
+                    {
+                        opaque = false;
+                    }
+                }
+            }
+
+            // Check subsurface
+            BindInputPtr subsurface = shaderRef->getBindInput("subsurface");
+            if (subsurface)
+            {
+                if (subsurface->getConnectedOutput())
+                {
+                    opaque = false;
+                }
+                else
+                {
+                    ValuePtr value = subsurface->getValue();
+                    if (value && value->isA<float>() && !isZero(value->asA<float>()))
+                    {
+                        opaque = false;
                     }
                 }
             }
@@ -755,7 +772,7 @@ vector<Vector2> getUdimCoordinates(const StringVec& udimIdentifiers)
         int uVal = udimVal % 10;
         uVal = (uVal == 0) ? 9 : uVal - 1;
         int vVal = (udimVal - uVal - 1) / 10;
-        udimCoordinates.push_back(Vector2(static_cast<float>(uVal), static_cast<float>(vVal)));
+        udimCoordinates.emplace_back(static_cast<float>(uVal), static_cast<float>(vVal));
     }
 
     return udimCoordinates;

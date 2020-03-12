@@ -18,7 +18,7 @@ namespace
     /// as input, and return a 2 channel vector as output
     const string sampleSizeFunctionUV = "mx_compute_sample_size_uv";
 
-    const float filterSize = 2.0;
+    const float filterSize = 1.0;
     const float filterOffset = 0.0;
 }
 
@@ -107,22 +107,6 @@ void BlurNode::emitFunctionCall(const ShaderNode& node, GenContext& context, Sha
 
         // Sample count is square of filter size
         const unsigned int sampleCount = filterWidth*filterWidth;
-
-        // Check for type of filter to apply
-        // Default to box filter
-        //
-        string weightArrayVariable = BOX_WEIGHTS_VARIABLE;
-        if (sampleCount > 1)
-        {
-            if (filterTypeInput->getValue())
-            {
-                // Use Gaussian filter.
-                if (filterTypeInput->getValue()->getValueString() == GAUSSIAN_FILTER)
-                {
-                    weightArrayVariable = GAUSSIAN_WEIGHTS_VARIABLE;
-                }
-            }
-        }
 
         // Emit samples
         // Note: The maximum sample count MX_MAX_SAMPLE_COUNT is defined in the shader code and 

@@ -229,7 +229,7 @@ vector<PortElementPtr> Document::getMatchingPorts(const string& nodeName) const
     return ports;
 }
 
-ValuePtr Document::getGeomAttrValue(const string& geomAttrName, const string& geom) const
+ValuePtr Document::getGeomPropValue(const string& geomPropName, const string& geom) const
 {
     ValuePtr value;
     for (GeomInfoPtr geomInfo : getGeomInfos())
@@ -238,10 +238,10 @@ ValuePtr Document::getGeomAttrValue(const string& geomAttrName, const string& ge
         {
             continue;
         }
-        GeomAttrPtr geomAttr = geomInfo->getGeomAttr(geomAttrName);
-        if (geomAttr)
+        GeomPropPtr geomProp = geomInfo->getGeomProp(geomPropName);
+        if (geomProp)
         {
-            value = geomAttr->getValue();
+            value = geomProp->getValue();
         }
     }
     return value;
@@ -470,16 +470,16 @@ void Document::upgradeVersion()
         }
 
         // Combine udim assignments into udim sets.
-        if (getGeomAttrValue("udim") && !getGeomAttrValue("udimset"))
+        if (getGeomPropValue("udim") && !getGeomPropValue("udimset"))
         {
             StringSet udimSet;
             for (GeomInfoPtr geomInfo : getGeomInfos())
             {
-                for (GeomAttrPtr geomAttr : geomInfo->getGeomAttrs())
+                for (GeomPropPtr geomProp : geomInfo->getGeomProps())
                 {
-                    if (geomAttr->getName() == "udim")
+                    if (geomProp->getName() == "udim")
                     {
-                        udimSet.insert(geomAttr->getValueString());
+                        udimSet.insert(geomProp->getValueString());
                     }
                 }
             }
@@ -498,7 +498,7 @@ void Document::upgradeVersion()
             }
 
             GeomInfoPtr udimSetInfo = addGeomInfo();
-            udimSetInfo->setGeomAttrValue("udimset", udimSetString, getTypeString<StringVec>());
+            udimSetInfo->setGeomPropValue("udimset", udimSetString, getTypeString<StringVec>());
         }
 
         minorVersion = 34;
@@ -599,6 +599,220 @@ void Document::upgradeVersion()
             }
         }
         minorVersion = 36;
+    }
+
+    // Upgrade from 1.36 to 1.37
+    if (majorVersion == 1 && minorVersion == 36)
+    {
+        // Convert type attributes to child outputs.
+        for (NodeDefPtr nodeDef : getNodeDefs())
+        {
+            InterfaceElementPtr interfaceElem = std::static_pointer_cast<InterfaceElement>(nodeDef);
+            if (interfaceElem && interfaceElem->hasType())
+            {
+                string type = interfaceElem->getAttribute(TypedElement::TYPE_ATTRIBUTE);
+                OutputPtr outputPtr;
+                if (!type.empty() && type != MULTI_OUTPUT_TYPE_STRING)
+                {
+                    outputPtr = interfaceElem->getOutput("out");
+                    if (!outputPtr)
+                    {
+                        outputPtr = interfaceElem->addOutput("out", type);
+                    }
+                }
+                interfaceElem->removeAttribute(TypedElement::TYPE_ATTRIBUTE);
+
+                const string& defaultInput = interfaceElem->getAttribute(Output::DEFAULT_INPUT_ATTRIBUTE);
+                if (outputPtr && !defaultInput.empty())
+                {
+                    outputPtr->setAttribute(Output::DEFAULT_INPUT_ATTRIBUTE, defaultInput);
+                }
+                interfaceElem->removeAttribute(Output::DEFAULT_INPUT_ATTRIBUTE);
+            }
+        }
+
+        // Convert geometric attributes to geometric properties.
+        for (GeomInfoPtr geomInfo : getGeomInfos())
+        {
+            vector<ElementPtr> origChildren = geomInfo->getChildren();
+            for (ElementPtr child : origChildren)
+            {
+                if (child->getCategory() == "geomattr")
+                {
+                    updateChildSubclass<GeomProp>(geomInfo, child);
+                }
+            }
+        }
+        for (ElementPtr elem : traverseTree())
+        {
+            NodePtr node = elem->asA<Node>();
+            if (!node)
+            {
+                continue;
+            }
+
+            if (node->getCategory() == "geomattrvalue")
+            {
+                node->setCategory("geompropvalue");
+                if (node->hasAttribute("attrname"))
+                {
+                    node->setAttribute("geomprop", node->getAttribute("attrname"));
+                    node->removeAttribute("attrname");
+                }
+            }
+        }
+
+        const string BACKDROP_NODE = "backdrop";
+        const string INVERT_NODE = "invert";
+        const string INVERT_MATRIX_NODE = "invertmatrix";
+        const string ROTATE_NODE = "rotate";
+        const string ROTATE2D_NODE = "rotate2d";
+        const string ROTATE3D_NODE = "rotate3d";
+        const string COMPARE_NODE = "compare";
+        const string CUTOFF_PARAMETER = "cutoff";
+        const string INTEST_INPUT = "intest";
+        const string TRANSFORMPOINT_NODE = "transformpoint";
+        const string TRANSFORMVECTOR_NODE = "transformvector";
+        const string TRANSFORMNORMAL_NODE = "transformnormal";
+        const string FROMSPACE_INPUT = "fromspace";
+        const string TOSPACE_INPUT = "tospace";
+        const string TRANSFORMMATRIX_NODE = "transformmatrix";
+        const string IFGREATEREQ_NODE = "ifgreatereq";
+        const string VALUE1_INPUT = "value1";
+        const string VALUE2_INPUT = "value2";
+        const string COMBINE_NODE = "combine";
+        const string IN3_INPUT = "in3";
+        const string IN4_INPUT = "in4";
+        const string SEPARATE_NODE = "separate";
+        const string IN_INPUT = "in";
+        const string TWO_STRING = "2";
+        const string THREE_STRING = "3";
+        const string FOUR_STRING = "4";
+        for (ElementPtr elem : traverseTree())
+        {
+            NodePtr node = elem->asA<Node>();
+            if (!node)
+            {
+                continue;
+            }
+            const string& nodeCategory = node->getCategory();
+
+            // Change category from "invert to "invertmatrix" for matrix invert nodes
+            if (nodeCategory == INVERT_NODE &&
+                (node->getType() == getTypeString<Matrix33>() || node->getType() == getTypeString<Matrix44>()))
+            {
+                node->setCategory(INVERT_MATRIX_NODE);
+            }
+
+            // Change category from "rotate" to "rotate2d" or "rotate3d" nodes
+            else if (nodeCategory == ROTATE_NODE)
+            {
+                node->setCategory((node->getType() == getTypeString<Vector2>()) ? ROTATE2D_NODE : ROTATE3D_NODE);
+            }
+
+            // Convert "compare" node to "ifgreatereq".
+            else if (nodeCategory == COMPARE_NODE)
+            {
+                node->setCategory(IFGREATEREQ_NODE);
+                // "cutoff" parameter becomes "value1" input
+                ParameterPtr cutoff = node->getParameter(CUTOFF_PARAMETER);
+                if (cutoff)
+                {
+                    InputPtr value2 = node->addInput(VALUE1_INPUT);
+                    value2->copyContentFrom(cutoff);
+                    node->removeChild(CUTOFF_PARAMETER);
+                }
+                // "intest" input becomes "value2" input
+                InputPtr intest = node->getInput(INTEST_INPUT);
+                if (intest)
+                {
+                    intest->setName(VALUE2_INPUT);
+                }
+            }
+
+            // Change nodes with category "tranform[vector|point|normal]",
+            // which are not fromspace/tospace variants, to "transformmatrix"
+            else if (nodeCategory == TRANSFORMPOINT_NODE ||
+                     nodeCategory == TRANSFORMVECTOR_NODE ||
+                     nodeCategory == TRANSFORMNORMAL_NODE)
+            {
+                if (!node->getChild(FROMSPACE_INPUT) && !node->getChild(TOSPACE_INPUT))
+                {
+                    node->setCategory(TRANSFORMMATRIX_NODE);
+                }
+            }
+
+            // Convert "combine" to "combine2", "combine3" or "combine4"
+            else if (nodeCategory == COMBINE_NODE)
+            {
+                if (node->getChild(IN4_INPUT))
+                {
+                    node->setCategory(COMBINE_NODE + FOUR_STRING);
+                }
+                else if (node->getChild(IN3_INPUT))
+                {
+                    node->setCategory(COMBINE_NODE + THREE_STRING);
+                }
+                else
+                {
+                    node->setCategory(COMBINE_NODE + TWO_STRING);
+                }
+            }
+
+            // Convert "separate" to "separate2", "separate3" or "separate4"
+            else if (nodeCategory == SEPARATE_NODE)
+            {
+                InputPtr in = node->getInput(IN_INPUT);
+                if (in)
+                {
+                    const string& inType = in->getType();
+                    if (inType == getTypeString<Vector4>() || inType == getTypeString<Color4>())
+                    {
+                        node->setCategory(SEPARATE_NODE + FOUR_STRING);
+                    }
+                    else if (inType == getTypeString<Vector3>() || inType == getTypeString<Color3>())
+                    {
+                        node->setCategory(SEPARATE_NODE + THREE_STRING);
+                    }
+                    else
+                    {
+                        node->setCategory(SEPARATE_NODE + TWO_STRING);
+                    }
+                }
+            }
+
+            // Convert backdrop nodes to backdrop elements
+            else if (nodeCategory == BACKDROP_NODE)
+            {
+                const string& nodeName = node->getName();
+                BackdropPtr backdrop = addBackdrop(nodeName);
+                for (const ParameterPtr param : node->getParameters())
+                {
+                    ValuePtr value = param ? param->getValue() : nullptr;
+                    if (value)
+                    {
+                        if (value->isA<string>())
+                        {
+                            backdrop->setAttribute(param->getName(), value->asA<string>());
+                        }
+                        else if (value->isA<float>())
+                        {
+                            backdrop->setTypedAttribute(param->getName(), value->asA<float>());
+                        }
+                    }
+                }
+                removeNode(nodeName);
+            }
+        }
+
+        // Remove deprecated nodedefs
+        removeNodeDef("ND_backdrop");
+        removeNodeDef("ND_invert_matrix33");
+        removeNodeDef("ND_invert_matrix44");
+        removeNodeDef("ND_rotate_vector2");
+        removeNodeDef("ND_rotate_vector3");
+
+        minorVersion = 37;
     }
 
     if (majorVersion == MATERIALX_MAJOR_VERSION &&

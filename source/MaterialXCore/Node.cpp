@@ -13,11 +13,15 @@
 namespace MaterialX
 {
 
+const string Backdrop::CONTAINS_ATTRIBUTE = "contains";
+const string Backdrop::WIDTH_ATTRIBUTE = "width";
+const string Backdrop::HEIGHT_ATTRIBUTE = "height";
+
 //
 // Node methods
 //
 
-InputPtr Node::setConnectedNode(const string& inputName, NodePtr node)
+void Node::setConnectedNode(const string& inputName, NodePtr node)
 {
     InputPtr input = getInput(inputName);
     if (!input)
@@ -32,7 +36,6 @@ InputPtr Node::setConnectedNode(const string& inputName, NodePtr node)
     {
         input->setConnectedNode(node);
     }
-    return input;
 }
 
 NodePtr Node::getConnectedNode(const string& inputName) const
@@ -45,7 +48,7 @@ NodePtr Node::getConnectedNode(const string& inputName) const
     return input->getConnectedNode();    
 }
 
-InputPtr Node::setConnectedNodeName(const string& inputName, const string& nodeName)
+void Node::setConnectedNodeName(const string& inputName, const string& nodeName)
 {
     InputPtr input = getInput(inputName);
     if (!input)
@@ -53,7 +56,6 @@ InputPtr Node::setConnectedNodeName(const string& inputName, const string& nodeN
         input = addInput(inputName);
     }
     input->setNodeName(nodeName);
-    return input;
 }
 
 string Node::getConnectedNodeName(const string& inputName) const
@@ -391,7 +393,7 @@ string GraphElement::asStringDot() const
             dot += "    \"" + nameMap[node->getName()] + "\" ";
             NodeDefPtr nodeDef = node->getNodeDef();
             const string& nodeGroup = nodeDef ? nodeDef->getNodeGroup() : EMPTY_STRING;
-            if (nodeGroup == CONDITIONAL_NODE_GROUP)
+            if (nodeGroup == NodeDef::CONDITIONAL_NODE_GROUP)
             {
                 dot += "[shape=diamond];\n";
             }
@@ -484,14 +486,7 @@ bool NodeGraph::validate(string* message) const
         validateRequire(nodeDef != nullptr, res, message, "NodeGraph implementation refers to non-existent NodeDef");
         if (nodeDef)
         {
-            if (nodeDef->isMultiOutputType())
-            {
-                validateRequire(getOutputCount() == nodeDef->getOutputCount(), res, message, "NodeGraph implementation has a different number of outputs than its NodeDef");
-            }
-            else
-            {
-                validateRequire(getOutputCount() == 1, res, message, "NodeGraph implementation has a different number of outputs than its NodeDef");
-            }
+            validateRequire(getOutputCount() == nodeDef->getActiveOutputs().size(), res, message, "NodeGraph implementation has a different number of outputs than its NodeDef");
         }
     }
     return GraphElement::validate(message) && res;

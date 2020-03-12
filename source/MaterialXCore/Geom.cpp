@@ -21,7 +21,6 @@ const string GeomElement::COLLECTION_ATTRIBUTE = "collection";
 const string GeomPropDef::GEOM_PROP_ATTRIBUTE = "geomprop";
 const string GeomPropDef::SPACE_ATTRIBUTE = "space";
 const string GeomPropDef::INDEX_ATTRIBUTE = "index";
-const string GeomPropDef::ATTR_NAME_ATTRIBUTE = "attrname";
 const string Collection::INCLUDE_GEOM_ATTRIBUTE = "includegeom";
 const string Collection::EXCLUDE_GEOM_ATTRIBUTE = "excludegeom";
 const string Collection::INCLUDE_COLLECTION_ATTRIBUTE = "includecollection";
@@ -31,7 +30,7 @@ bool geomStringsMatch(const string& geom1, const string& geom2, bool contains)
     vector<GeomPath> paths1;
     for (const string& name1 : splitString(geom1, ARRAY_VALID_SEPARATORS))
     {
-        paths1.push_back(GeomPath(name1));
+        paths1.emplace_back(name1);
     }
     for (const string& name2 : splitString(geom2, ARRAY_VALID_SEPARATORS))
     {

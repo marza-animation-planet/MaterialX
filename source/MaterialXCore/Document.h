@@ -171,8 +171,8 @@ class Document : public GraphElement
         removeChildOfType<GeomInfo>(name);
     }
 
-    /// Return the value of a geometric attribute for the given geometry string.
-    ValuePtr getGeomAttrValue(const string& geomAttrName, const string& geom = UNIVERSAL_GEOM_NAME) const;
+    /// Return the value of a geometric property for the given geometry string.
+    ValuePtr getGeomPropValue(const string& geomPropName, const string& geom = UNIVERSAL_GEOM_NAME) const;
 
     /// @}
     /// @name GeomPropDef Elements
@@ -237,6 +237,38 @@ class Document : public GraphElement
     void removeLook(const string& name)
     {
         removeChildOfType<Look>(name);
+    }
+
+    /// @}
+    /// @name LookGroup Elements
+    /// @{
+
+    /// Add a LookGroup to the document.
+    /// @param name The name of the new LookGroup.
+    ///     If no name is specified, then a unique name will automatically be
+    ///     generated.
+    /// @return A shared pointer to the new LookGroup.
+    LookGroupPtr addLookGroup(const string& name = EMPTY_STRING)
+    {
+        return addChild<LookGroup>(name);
+    }
+
+    /// Return the LookGroup, if any, with the given name.
+    LookGroupPtr getLookGroup(const string& name) const
+    {
+        return getChildOfType<LookGroup>(name);
+    }
+
+    /// Return a vector of all LookGroup elements in the document.
+    vector<LookGroupPtr> getLookGroups() const
+    {
+        return getChildrenOfType<LookGroup>();
+    }
+
+    /// Remove the LookGroup, if any, with the given name.
+    void removeLookGroup(const string& name)
+    {
+        removeChildOfType<LookGroup>(name);
     }
 
     /// @}
@@ -319,7 +351,10 @@ class Document : public GraphElement
                           const string& node = EMPTY_STRING)
     {
         NodeDefPtr child = addChild<NodeDef>(name);
-        child->setType(type);
+        if (!type.empty() && type != MULTI_OUTPUT_TYPE_STRING)
+        {
+            child->addOutput("out", type);
+        }
         if (!node.empty())
         {
             child->setNodeString(node);

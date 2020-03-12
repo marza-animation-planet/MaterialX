@@ -32,9 +32,9 @@ class GlslShaderGeneratorTester : public GenShaderUtil::ShaderGeneratorTester
     {
         ParentClass::setupDependentLibraries();
 
-        mx::FilePath lightDir = mx::FilePath::getCurrentPath() / mx::FilePath("resources/Materials/TestSuite/Utilities/Lights");
-        loadLibrary(lightDir / mx::FilePath("lightcompoundtest.mtlx"), _dependLib);
-        loadLibrary(lightDir / mx::FilePath("light_rig.mtlx"), _dependLib);
+        mx::FilePath lightDir = mx::FilePath::getCurrentPath() / mx::FilePath("resources/Materials/TestSuite/lights");
+        loadLibrary(lightDir / mx::FilePath("light_compound_test.mtlx"), _dependLib);
+        loadLibrary(lightDir / mx::FilePath("light_rig_test_1.mtlx"), _dependLib);
     }
 
   protected:
@@ -43,7 +43,7 @@ class GlslShaderGeneratorTester : public GenShaderUtil::ShaderGeneratorTester
         whiteList =
         {
             "ambientocclusion", "arrayappend", "backfacing", "screen", "curveadjust", "displacementshader",
-            "volumeshader", "IM_constant_", "IM_dot_", "IM_geomattrvalue", "IM_light_genglsl",
+            "volumeshader", "IM_constant_", "IM_dot_", "IM_geompropvalue", "IM_light_genglsl",
             "IM_point_light_genglsl", "IM_spot_light_genglsl", "IM_directional_light_genglsl", "IM_angle"
         };
     }

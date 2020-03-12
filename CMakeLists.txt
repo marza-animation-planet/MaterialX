@@ -1,7 +1,7 @@
 project(MaterialX)
 set(MATERIALX_MAJOR_VERSION 1)
-set(MATERIALX_MINOR_VERSION 36)
-set(MATERIALX_BUILD_VERSION 5)
+set(MATERIALX_MINOR_VERSION 37)
+set(MATERIALX_BUILD_VERSION 0)
 set(MATERIALX_LIBRARY_VERSION ${MATERIALX_MAJOR_VERSION}.${MATERIALX_MINOR_VERSION}.${MATERIALX_BUILD_VERSION})
 
 cmake_minimum_required(VERSION 3.1)
@@ -24,7 +24,7 @@ set(MATERIALX_PYTHON_EXECUTABLE "" CACHE FILEPATH
 set(MATERIALX_PYTHON_OCIO_DIR "" CACHE PATH
     "Path to a folder containing the default OCIO configuration to be packaged with MaterialX Python (e.g. 'D:/Projects/OpenColorIO-Configs/aces_1.0.3').")
 set(MATERIALX_PYTHON_PYBIND11_DIR "${CMAKE_CURRENT_SOURCE_DIR}/source/PyMaterialX/PyBind11" CACHE PATH
-    "Path to a folder containing the PyBind11 source. Defaults to the included PyBind11 source, which has been extended to support Python 2.6.")
+    "Path to a folder containing the PyBind11 source to be used in building MaterialX Python. Defaults to the included PyBind11 source.")
 
 mark_as_advanced(MATERIALX_BUILD_DOCS)
 mark_as_advanced(MATERIALX_PYTHON_LTO)
@@ -35,24 +35,24 @@ mark_as_advanced(MATERIALX_PYTHON_EXECUTABLE)
 mark_as_advanced(MATERIALX_PYTHON_OCIO_DIR)
 mark_as_advanced(MATERIALX_PYTHON_PYBIND11_DIR)
 
-# Validation options for compiling and rendering generated shaders
-option(MATERIALX_TEST_RENDER "Run rendering tests for MaterialX Render module. GPU required for graphics validation." OFF)
+# Render validation options
+option(MATERIALX_TEST_RENDER "Run rendering tests for the MaterialXRender module. GPU required for graphics validation." ON)
 mark_as_advanced(MATERIALX_TEST_RENDER)
+set(MATERIALX_OSLC_EXECUTABLE "" CACHE FILEPATH "For OSL validation, a full path to the oslc binary.")
+mark_as_advanced(MATERIALX_OSLC_EXECUTABLE)
+add_definitions(-DMATERIALX_OSLC_EXECUTABLE=\"${MATERIALX_OSLC_EXECUTABLE}\")
+set(MATERIALX_TESTRENDER_EXECUTABLE "" CACHE FILEPATH "For OSL validation, a full path to the testrender binary.")
+mark_as_advanced(MATERIALX_TESTRENDER_EXECUTABLE)
+add_definitions(-DMATERIALX_TESTRENDER_EXECUTABLE=\"${MATERIALX_TESTRENDER_EXECUTABLE}\")
+set(MATERIALX_OSL_INCLUDE_PATH "" CACHE PATH "For OSL validation, an additional set of search paths for shader includes.")
+mark_as_advanced(MATERIALX_OSL_INCLUDE_PATH)
+add_definitions(-DMATERIALX_OSL_INCLUDE_PATH=\"${MATERIALX_OSL_INCLUDE_PATH}\")
+
+# OpenImageIO options
 option(MATERIALX_BUILD_OIIO "Build OpenImageIO support for MaterialXRender." OFF)
 mark_as_advanced(MATERIALX_BUILD_OIIO)
 set(MATERIALX_OIIO_DIR "" CACHE PATH "Path to the root folder of the OpenImageIO installation.")
 mark_as_advanced(MATERIALX_OIIO_DIR)
-
-# Helpers for OSL validation
-set(MATERIALX_OSLC_EXECUTABLE "" CACHE FILEPATH "Full path to the oslc binary.")
-mark_as_advanced(MATERIALX_OSLC_EXECUTABLE)
-add_definitions(-DMATERIALX_OSLC_EXECUTABLE=\"${MATERIALX_OSLC_EXECUTABLE}\")
-set(MATERIALX_TESTRENDER_EXECUTABLE "" CACHE FILEPATH "Full path to the testrender binary.")
-mark_as_advanced(MATERIALX_TESTRENDER_EXECUTABLE)
-add_definitions(-DMATERIALX_TESTRENDER_EXECUTABLE=\"${MATERIALX_TESTRENDER_EXECUTABLE}\")
-set(MATERIALX_OSL_INCLUDE_PATH "" CACHE PATH "Full path to osl include paths. e.g. location of stdosl.h")
-mark_as_advanced(MATERIALX_OSL_INCLUDE_PATH)
-add_definitions(-DMATERIALX_OSL_INCLUDE_PATH=\"${MATERIALX_OSL_INCLUDE_PATH}\")
 
 # Adjust the default installation path
 if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)

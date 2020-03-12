@@ -56,9 +56,9 @@ TEST_CASE("Geom elements", "[geom]")
     // Create a geominfo with an attribute.
     mx::GeomInfoPtr geominfo4 = doc->addGeomInfo("geominfo4", "/robot1");
     mx::StringVec udimSet = {"1001", "1002", "1003", "1004"};
-    geominfo4->setGeomAttrValue("udimset", udimSet);
-    REQUIRE(doc->getGeomAttrValue("udimset", "/robot1")->asA<mx::StringVec>() == udimSet);
-    REQUIRE(doc->getGeomAttrValue("udimset", "/robot2") == nullptr);
+    geominfo4->setGeomPropValue("udimset", udimSet);
+    REQUIRE(doc->getGeomPropValue("udimset", "/robot1")->asA<mx::StringVec>() == udimSet);
+    REQUIRE(doc->getGeomPropValue("udimset", "/robot2") == nullptr);
 
     // Create a base collection.
     mx::CollectionPtr collection1 = doc->addCollection("collection1");
@@ -95,7 +95,7 @@ TEST_CASE("GeomPropDef", "[geom]")
 
     // Create a NodeDef with an input that defaults to the declared world-space
     // normal property.
-    mx::NodeDefPtr nodeDef = doc->addNodeDef("ND_foo", "color3", "foo");
+    doc->addNodeDef("ND_foo", "color3", "foo");
     mx::InputPtr input = doc->addInput("input1", "vector3");
     input->setDefaultGeomPropString(worldNormal->getName());
 

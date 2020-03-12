@@ -1,5 +1,5 @@
 <?xml version="1.0"?>
-<materialx version="1.36" require="">
+<materialx version="1.37">
   <nodegraph name="IMPL_standard_surface_graph" type="" xpos="5.77241" ypos="16.6699">
     <constant name="coat_affect_roughness" type="float" xpos="-5.97931" ypos="17.86">
       <parameter name="value" type="float" value="1.0000" />
@@ -125,7 +125,6 @@
     </luminance>
     <swizzle name="luminance1_x" type="float" xpos="13.869" ypos="12.42">
       <input name="in" type="color3" nodename="luminance1" />
-      <:anonymous name="1" />
       <parameter name="channels" type="string" value="r" />
     </swizzle>
     <surface name="Surface_Constructor" type="surfaceshader" xpos="15.4276" ypos="6.84">

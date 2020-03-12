@@ -36,8 +36,8 @@ void bindPyDocument(py::module& mod)
         .def("getGeomInfo", &mx::Document::getGeomInfo)
         .def("getGeomInfos", &mx::Document::getGeomInfos)
         .def("removeGeomInfo", &mx::Document::removeGeomInfo)
-        .def("getGeomAttrValue", &mx::Document::getGeomAttrValue,
-            py::arg("geomAttrName"), py::arg("geom") = mx::UNIVERSAL_GEOM_NAME)
+        .def("getGeomPropValue", &mx::Document::getGeomPropValue,
+            py::arg("geomPropName"), py::arg("geom") = mx::UNIVERSAL_GEOM_NAME)
         .def("addGeomPropDef", &mx::Document::addGeomPropDef)
         .def("getGeomPropDef", &mx::Document::getGeomPropDef)
         .def("getGeomPropDefs", &mx::Document::getGeomPropDefs)
@@ -47,6 +47,11 @@ void bindPyDocument(py::module& mod)
         .def("getLook", &mx::Document::getLook)
         .def("getLooks", &mx::Document::getLooks)
         .def("removeLook", &mx::Document::removeLook)
+        .def("addLookGroup", &mx::Document::addLookGroup,
+            py::arg("name") = mx::EMPTY_STRING)
+        .def("getLookGroup", &mx::Document::getLookGroup)
+        .def("getLookGroups", &mx::Document::getLookGroups)
+        .def("removeLookGroup", &mx::Document::removeLookGroup)
         .def("addCollection", &mx::Document::addCollection,
             py::arg("name") = mx::EMPTY_STRING)
         .def("getCollection", &mx::Document::getCollection)

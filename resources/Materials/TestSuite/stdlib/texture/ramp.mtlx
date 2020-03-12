@@ -1,3 +1,4 @@
+<?xml version="1.0"?>
 <!--
 
 Basic ramp unit test :
@@ -7,8 +8,7 @@ Basic ramp unit test :
 - Ramp (four coner)
 
 -->
-<?xml version="1.0"?>
-<materialx version="1.36">
+<materialx version="1.37">
    <!-- Left-to-right tests -->
    <output name="lr_ramp4_output" type="color4" nodename="lr_ramp4" /> 
    <ramplr name="lr_ramp4" type="color4">

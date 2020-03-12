@@ -152,7 +152,7 @@ FilePathVec FilePath::getFilesInDirectory(const string& extension) const
         {
             if (!(fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
             {
-                files.push_back(FilePath(fd.cFileName));
+                files.emplace_back(fd.cFileName);
             }
         } while (FindNextFile(hFind, &fd));
         FindClose(hFind);
@@ -209,7 +209,22 @@ FilePathVec FilePath::getSubDirectories() const
         while (struct dirent* entry = readdir(dir))
         {
             string path = entry->d_name;
-            if (entry->d_type == DT_DIR && (path != "." && path != ".."))
+            if (path == "." || path == "..")
+            {
+                continue;
+            }
+
+            auto d_type = entry->d_type;
+            FilePath newDir = *this / path;
+
+            if (d_type == DT_UNKNOWN)
+            {
+                if (newDir.isDirectory())
+                {
+                    d_type = DT_DIR;
+                }
+            }
+            if (d_type == DT_DIR)
             {
                 FilePath newDir = *this / path;
                 FilePathVec newDirs = newDir.getSubDirectories();

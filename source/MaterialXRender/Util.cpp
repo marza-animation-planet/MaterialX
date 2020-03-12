@@ -34,6 +34,51 @@ ShaderPtr createConstantShader(GenContext& context,
     return createShader(shaderName, context, output);
 }
 
+ShaderPtr createDepthShader(GenContext& context,
+                            DocumentPtr stdLib,
+                            const string& shaderName)
+{
+    // Construct a dummy nodegraph.
+    DocumentPtr doc = createDocument();
+    doc->importLibrary(stdLib);
+    NodeGraphPtr nodeGraph = doc->addNodeGraph();
+    NodePtr constant = nodeGraph->addNode("constant");
+    constant->setParameterValue("value", Color3(0.0f));
+    OutputPtr output = nodeGraph->addOutput();
+    output->setConnectedNode(constant);
+
+    // Generate the shader
+    GenContext depthContext = context;
+    depthContext.getOptions().hwWriteDepthMoments = true;
+    ShaderPtr shader = createShader(shaderName, depthContext, output);
+
+    return shader;
+}
+
+ShaderPtr createBlurShader(GenContext& context,
+                           DocumentPtr stdLib,
+                           const string& shaderName,
+                           const string& filterType,
+                           float filterSize)
+{
+    // Construct the blur nodegraph
+    DocumentPtr doc = createDocument();
+    doc->importLibrary(stdLib);
+    NodeGraphPtr nodeGraph = doc->addNodeGraph();
+    NodePtr imageNode = nodeGraph->addNode("image", "image");
+    NodePtr blurNode = nodeGraph->addNode("blur", "blur");
+    blurNode->setConnectedNode("in", imageNode);
+    blurNode->setParameterValue("size", filterSize);
+    blurNode->setParameterValue("filtertype", filterType);
+    OutputPtr output = nodeGraph->addOutput();
+    output->setConnectedNode(blurNode);
+
+    // Generate the shader
+    GenContext blurContext = context;
+    blurContext.getOptions().fileTextureVerticalFlip = false;
+    return createShader(shaderName, blurContext, output);
+}
+
 unsigned int getUIProperties(ConstValueElementPtr nodeDefElement, UIProperties& uiProperties)
 {
     if (!nodeDefElement)
@@ -119,6 +164,39 @@ unsigned int getUIProperties(ConstValueElementPtr nodeDefElement, UIProperties& 
         if (value)
         {
             uiProperties.uiMax = value;
+            propertyCount++;
+        }
+    }
+
+    const string& uiSoftMinString = nodeDefElement->getAttribute(ValueElement::UI_SOFT_MIN_ATTRIBUTE);
+    if (!uiSoftMinString.empty())
+    {
+        ValuePtr value = Value::createValueFromStrings(uiSoftMinString, nodeDefElement->getType());
+        if (value)
+        {
+            uiProperties.uiSoftMin = value;
+            propertyCount++;
+        }
+    }
+
+    const string& uiSoftMaxString = nodeDefElement->getAttribute(ValueElement::UI_SOFT_MAX_ATTRIBUTE);
+    if (!uiSoftMaxString.empty())
+    {
+        ValuePtr value = Value::createValueFromStrings(uiSoftMaxString, nodeDefElement->getType());
+        if (value)
+        {
+            uiProperties.uiSoftMax = value;
+            propertyCount++;
+        }
+    }
+
+    const string& uiStepString = nodeDefElement->getAttribute(ValueElement::UI_STEP_ATTRIBUTE);
+    if (!uiStepString.empty())
+    {
+        ValuePtr value = Value::createValueFromStrings(uiStepString, nodeDefElement->getType());
+        if (value)
+        {
+            uiProperties.uiStep = value;
             propertyCount++;
         }
     }

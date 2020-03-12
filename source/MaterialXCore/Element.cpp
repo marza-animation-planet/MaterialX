@@ -21,6 +21,7 @@ const string Element::VERSION_ATTRIBUTE = "version";
 const string Element::DEFAULT_VERSION_ATTRIBUTE = "isdefaultversion";
 const string Element::INHERIT_ATTRIBUTE = "inherit";
 const string Element::NAMESPACE_ATTRIBUTE = "namespace";
+const string Element::DOC_ATTRIBUTE = "doc";
 const string TypedElement::TYPE_ATTRIBUTE = "type";
 const string ValueElement::VALUE_ATTRIBUTE = "value";
 const string ValueElement::INTERFACE_NAME_ATTRIBUTE = "interfacename";
@@ -32,6 +33,9 @@ const string ValueElement::UI_NAME_ATTRIBUTE = "uiname";
 const string ValueElement::UI_FOLDER_ATTRIBUTE = "uifolder";
 const string ValueElement::UI_MIN_ATTRIBUTE = "uimin";
 const string ValueElement::UI_MAX_ATTRIBUTE = "uimax";
+const string ValueElement::UI_SOFT_MIN_ATTRIBUTE = "uisoftmin";
+const string ValueElement::UI_SOFT_MAX_ATTRIBUTE = "uisoftmax";
+const string ValueElement::UI_STEP_ATTRIBUTE = "uistep";
 const string ValueElement::UI_ADVANCED_ATTRIBUTE = "uiadvanced";
 const string ValueElement::UNIT_ATTRIBUTE = "unit";
 const string ValueElement::UNITTYPE_ATTRIBUTE = "unittype";
@@ -782,18 +786,20 @@ const string T::CATEGORY(category);                     \
 ElementRegistry<T> registry##T;                         \
 INSTANTIATE_SUBCLASS(T)
 
+INSTANTIATE_CONCRETE_SUBCLASS(Backdrop, "backdrop")
 INSTANTIATE_CONCRETE_SUBCLASS(BindParam, "bindparam")
 INSTANTIATE_CONCRETE_SUBCLASS(BindInput, "bindinput")
 INSTANTIATE_CONCRETE_SUBCLASS(BindToken, "bindtoken")
 INSTANTIATE_CONCRETE_SUBCLASS(Collection, "collection")
 INSTANTIATE_CONCRETE_SUBCLASS(Document, "materialx")
 INSTANTIATE_CONCRETE_SUBCLASS(GenericElement, "generic")
-INSTANTIATE_CONCRETE_SUBCLASS(GeomAttr, "geomattr")
 INSTANTIATE_CONCRETE_SUBCLASS(GeomInfo, "geominfo")
+INSTANTIATE_CONCRETE_SUBCLASS(GeomProp, "geomprop")
 INSTANTIATE_CONCRETE_SUBCLASS(GeomPropDef, "geompropdef")
 INSTANTIATE_CONCRETE_SUBCLASS(Implementation, "implementation")
 INSTANTIATE_CONCRETE_SUBCLASS(Input, "input")
 INSTANTIATE_CONCRETE_SUBCLASS(Look, "look")
+INSTANTIATE_CONCRETE_SUBCLASS(LookGroup, "lookgroup")
 INSTANTIATE_CONCRETE_SUBCLASS(Material, "material")
 INSTANTIATE_CONCRETE_SUBCLASS(MaterialAssign, "materialassign")
 INSTANTIATE_CONCRETE_SUBCLASS(Member, "member")

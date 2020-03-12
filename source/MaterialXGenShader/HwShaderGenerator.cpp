@@ -52,7 +52,7 @@ namespace HW
     const string T_VIEW_DIRECTION                 = "$viewDirection";
     const string T_FRAME                          = "$frame";
     const string T_TIME                           = "$time";
-    const string T_GEOMATTR                       = "$geomattr";
+    const string T_GEOMPROP                       = "$geomprop";
     const string T_NUM_ACTIVE_LIGHT_SOURCES       = "$numActiveLightSources";
     const string T_ENV_MATRIX                     = "$envMatrix";
     const string T_ENV_RADIANCE                   = "$envRadiance";
@@ -61,6 +61,8 @@ namespace HW
     const string T_ENV_IRRADIANCE                 = "$envIrradiance";
     const string T_AMB_OCC_MAP                    = "$ambOccMap";
     const string T_AMB_OCC_GAIN                   = "$ambOccGain";
+    const string T_SHADOW_MAP                     = "$shadowMap";
+    const string T_SHADOW_MATRIX                  = "$shadowMatrix";
     const string T_VERTEX_DATA_INSTANCE           = "$vd";
     const string T_LIGHT_DATA_INSTANCE            = "$lightData";
 
@@ -99,13 +101,15 @@ namespace HW
     const string VIEW_DIRECTION                   = "u_viewDirection";
     const string FRAME                            = "u_frame";
     const string TIME                             = "u_time";
-    const string GEOMATTR                         = "u_geomattr";
+    const string GEOMPROP                         = "u_geomprop";
     const string NUM_ACTIVE_LIGHT_SOURCES         = "u_numActiveLightSources";
     const string ENV_MATRIX                       = "u_envMatrix";
     const string ENV_RADIANCE                     = "u_envRadiance";
     const string ENV_RADIANCE_MIPS                = "u_envRadianceMips";
     const string ENV_RADIANCE_SAMPLES             = "u_envRadianceSamples";
     const string ENV_IRRADIANCE                   = "u_envIrradiance";
+    const string SHADOW_MAP                       = "u_shadowMap";
+    const string SHADOW_MATRIX                    = "u_shadowMatrix";
     const string AMB_OCC_MAP                      = "u_ambOccMap";
     const string AMB_OCC_GAIN                     = "u_ambOccGain";
     const string VERTEX_DATA_INSTANCE             = "vd";
@@ -174,13 +178,15 @@ HwShaderGenerator::HwShaderGenerator(SyntaxPtr syntax) :
     _tokenSubstitutions[HW::T_VIEW_DIRECTION] = HW::VIEW_DIRECTION;
     _tokenSubstitutions[HW::T_FRAME] = HW::FRAME;
     _tokenSubstitutions[HW::T_TIME] = HW::TIME;
-    _tokenSubstitutions[HW::T_GEOMATTR] = HW::GEOMATTR;
+    _tokenSubstitutions[HW::T_GEOMPROP] = HW::GEOMPROP;
     _tokenSubstitutions[HW::T_NUM_ACTIVE_LIGHT_SOURCES] = HW::NUM_ACTIVE_LIGHT_SOURCES;
     _tokenSubstitutions[HW::T_ENV_MATRIX] = HW::ENV_MATRIX;
     _tokenSubstitutions[HW::T_ENV_RADIANCE] = HW::ENV_RADIANCE;
     _tokenSubstitutions[HW::T_ENV_RADIANCE_MIPS] = HW::ENV_RADIANCE_MIPS;
     _tokenSubstitutions[HW::T_ENV_RADIANCE_SAMPLES] = HW::ENV_RADIANCE_SAMPLES;
     _tokenSubstitutions[HW::T_ENV_IRRADIANCE] = HW::ENV_IRRADIANCE;
+    _tokenSubstitutions[HW::T_SHADOW_MAP] = HW::SHADOW_MAP;
+    _tokenSubstitutions[HW::T_SHADOW_MATRIX] = HW::SHADOW_MATRIX;
     _tokenSubstitutions[HW::T_AMB_OCC_MAP] = HW::AMB_OCC_MAP;
     _tokenSubstitutions[HW::T_AMB_OCC_GAIN] = HW::AMB_OCC_GAIN;
     _tokenSubstitutions[HW::T_VERTEX_DATA_INSTANCE] = HW::VERTEX_DATA_INSTANCE;
@@ -236,6 +242,13 @@ ShaderPtr HwShaderGenerator::createShader(const string& name, ElementPtr element
 
     // Add a block for data from vertex to pixel shader.
     addStageConnectorBlock(HW::VERTEX_DATA, HW::T_VERTEX_DATA_INSTANCE, *vs, *ps);
+
+    // Add uniforms for shadow map rendering if needed.
+    if (context.getOptions().hwShadowMap)
+    {
+        psPrivateUniforms->add(Type::FILENAME, HW::T_SHADOW_MAP);
+        psPrivateUniforms->add(Type::MATRIX44, HW::T_SHADOW_MATRIX, Value::createValue(Matrix44::IDENTITY));
+    }
 
     // Add inputs and uniforms for ambient occlusion if needed.
     if (context.getOptions().hwAmbientOcclusion)
