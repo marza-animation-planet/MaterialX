@@ -1,4 +1,5 @@
 #include <MaterialXView/Viewer.h>
+#include <MaterialXFormat/Environ.h>
 
 #include <iostream>
 
@@ -100,8 +101,25 @@ int main(int argc, char* const argv[])
         }
     }
 
-    // Search current directory and parent directory if not found.
-    mx::FilePath currentPath(mx::FilePath::getCurrentPath());
+    // Search executable file directory and parent directory if not found.
+    mx::FilePath currentPath;
+    mx::FilePath execFile(argv[0]);
+    if (execFile.isAbsolute() || execFile.exists())
+    {
+        currentPath = execFile.getParentPath();
+    }
+    else
+    {
+        mx::FileSearchPath execSearchPath(mx::FilePath::getCurrentPath());
+        execSearchPath.append(mx::FileSearchPath(mx::getEnviron("PATH")));
+        currentPath = execSearchPath.find(execFile).getParentPath();
+    }
+
+    if (!currentPath.exists())
+    {
+        currentPath = mx::FilePath::getCurrentPath();
+    }
+
     mx::FilePath parentCurrentPath = currentPath.getParentPath();
     std::vector<mx::FilePath> libraryPaths =
     { 
