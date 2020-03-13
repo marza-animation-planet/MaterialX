@@ -20,7 +20,7 @@ mtlx_opts["MATERIALX_INSTALL_PYTHON"] = "0"
 
 
 def MaterialXNames(names=None):
-    namefunc = lambda x: "lib" + x + ".a" if sys.platform != "win32" else lambda x: x + ".dll"
+    namefunc = lambda x: "lib" + x + ".a" if sys.platform != "win32" else x + ".dll"
     libs = []
 
     for n in os.listdir("source"):
